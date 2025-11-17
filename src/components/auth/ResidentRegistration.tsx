@@ -4,6 +4,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { ArrowLeft, User, Mail, Phone, MapPin, Lock, Home, Users } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ResidentRegistrationProps {
   onSuccess: () => void;
@@ -11,6 +12,7 @@ interface ResidentRegistrationProps {
 }
 
 export function ResidentRegistration({ onSuccess, onBack }: ResidentRegistrationProps) {
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     houseNumber: '',
@@ -27,6 +29,7 @@ export function ResidentRegistration({ onSuccess, onBack }: ResidentRegistration
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -62,12 +65,21 @@ export function ResidentRegistration({ onSuccess, onBack }: ResidentRegistration
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+
     if (validateForm()) {
-      // In real app, send data to backend
-      console.log('Resident Registration Data:', formData);
-      onSuccess();
+      try {
+        await signUp(formData.email, formData.password, 'resident', formData);
+        onSuccess();
+      } catch (error: any) {
+        alert('Pendaftaran gagal: ' + (error.message || 'Terjadi kesalahan'));
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(false);
     }
   };
 
@@ -300,8 +312,8 @@ export function ResidentRegistration({ onSuccess, onBack }: ResidentRegistration
               </div>
 
               <div className="pt-4 space-y-3">
-                <Button type="submit" className="w-full" size="lg">
-                  Daftar sebagai Warga
+                <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+                  {isLoading ? 'Mendaftar...' : 'Daftar sebagai Warga'}
                 </Button>
                 <p className="text-xs text-center text-gray-600">
                   Dengan mendaftar, Anda menyetujui syarat dan ketentuan yang berlaku

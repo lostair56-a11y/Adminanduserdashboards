@@ -1,26 +1,104 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { User, Mail, Phone, MapPin, Save } from 'lucide-react';
 import { BankAccountSettings } from './BankAccountSettings';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import type { AdminProfile as AdminProfileType } from '../../lib/supabase';
+import { toast } from 'sonner';
 
 export function AdminProfile() {
+  const { profile, user } = useAuth();
+  const adminProfile = profile as AdminProfileType;
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: 'Ahmad Fauzi',
-    position: 'Ketua RT 003',
-    email: 'admin.rt003@email.com',
-    phone: '081234567890',
-    address: 'Jl. Mawar Indah No. 1, RW 005',
+    name: '',
+    position: '',
+    phone: '',
+    address: '',
   });
 
-  const handleSave = () => {
-    // Save to backend
-    alert('Profil berhasil diperbarui!');
-    setIsEditing(false);
+  useEffect(() => {
+    if (adminProfile) {
+      setFormData({
+        name: adminProfile.name || '',
+        position: adminProfile.position || '',
+        phone: adminProfile.phone || '',
+        address: adminProfile.address || '',
+      });
+    }
+  }, [adminProfile]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('admin_profiles')
+        .update({
+          name: formData.name,
+          position: formData.position,
+          phone: formData.phone,
+          address: formData.address,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast.success('Profil berhasil diperbarui!');
+      setIsEditing(false);
+      
+      // Reload to refresh profile data
+      window.location.reload();
+    } catch (error: any) {
+      toast.error('Gagal memperbarui profil: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleChangePassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const newPassword = (form.elements.namedItem('new-password') as HTMLInputElement).value;
+    const confirmPassword = (form.elements.namedItem('confirm-password') as HTMLInputElement).value;
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Kata sandi baru tidak cocok');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('Kata sandi minimal 6 karakter');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success('Kata sandi berhasil diubah!');
+      form.reset();
+    } catch (error: any) {
+      toast.error('Gagal mengubah kata sandi: ' + error.message);
+    }
+  };
+
+  if (!adminProfile) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -37,6 +115,7 @@ export function AdminProfile() {
             <div>
               <h2>{formData.name}</h2>
               <p className="text-gray-600">{formData.position}</p>
+              <p className="text-sm text-gray-500 mt-1">RT {adminProfile.rt} / RW {adminProfile.rw}</p>
             </div>
           </div>
 
@@ -77,12 +156,12 @@ export function AdminProfile() {
                   <Input
                     id="email"
                     type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    disabled={!isEditing}
-                    className="pl-10"
+                    value={adminProfile.email}
+                    disabled
+                    className="pl-10 bg-gray-50"
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Email tidak dapat diubah</p>
               </div>
 
               <div>
@@ -117,12 +196,12 @@ export function AdminProfile() {
             <div className="flex gap-3 pt-4">
               {isEditing ? (
                 <>
-                  <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1">
+                  <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1" disabled={isLoading}>
                     Batal
                   </Button>
-                  <Button onClick={handleSave} className="flex-1">
+                  <Button onClick={handleSave} className="flex-1" disabled={isLoading}>
                     <Save className="h-4 w-4 mr-2" />
-                    Simpan Perubahan
+                    {isLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </Button>
                 </>
               ) : (
@@ -143,21 +222,17 @@ export function AdminProfile() {
           <CardDescription>Ubah kata sandi akun Anda</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="current-password">Kata Sandi Saat Ini</Label>
-              <Input id="current-password" type="password" className="mt-1" />
-            </div>
+          <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
               <Label htmlFor="new-password">Kata Sandi Baru</Label>
-              <Input id="new-password" type="password" className="mt-1" />
+              <Input id="new-password" name="new-password" type="password" className="mt-1" required />
             </div>
             <div>
               <Label htmlFor="confirm-password">Konfirmasi Kata Sandi Baru</Label>
-              <Input id="confirm-password" type="password" className="mt-1" />
+              <Input id="confirm-password" name="confirm-password" type="password" className="mt-1" required />
             </div>
-            <Button className="w-full">Ubah Kata Sandi</Button>
-          </div>
+            <Button type="submit" className="w-full">Ubah Kata Sandi</Button>
+          </form>
         </CardContent>
       </Card>
     </div>

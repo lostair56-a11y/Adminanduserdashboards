@@ -4,6 +4,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { ArrowLeft, User, Mail, Phone, MapPin, Lock, Shield, CreditCard } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminRegistrationProps {
   onSuccess: () => void;
@@ -11,6 +12,7 @@ interface AdminRegistrationProps {
 }
 
 export function AdminRegistration({ onSuccess, onBack }: AdminRegistrationProps) {
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     position: '',
@@ -26,6 +28,7 @@ export function AdminRegistration({ onSuccess, onBack }: AdminRegistrationProps)
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -64,12 +67,21 @@ export function AdminRegistration({ onSuccess, onBack }: AdminRegistrationProps)
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+
     if (validateForm()) {
-      // In real app, send data to backend
-      console.log('Admin Registration Data:', formData);
-      onSuccess();
+      try {
+        await signUp(formData.email, formData.password, 'admin', formData);
+        onSuccess();
+      } catch (error: any) {
+        alert('Pendaftaran gagal: ' + (error.message || 'Terjadi kesalahan'));
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(false);
     }
   };
 
@@ -303,8 +315,8 @@ export function AdminRegistration({ onSuccess, onBack }: AdminRegistrationProps)
               </div>
 
               <div className="pt-4 space-y-3">
-                <Button type="submit" className="w-full" size="lg">
-                  Daftar sebagai Admin RT
+                <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+                  {isLoading ? 'Mendaftar...' : 'Daftar sebagai Admin RT'}
                 </Button>
                 <p className="text-xs text-center text-gray-600">
                   Dengan mendaftar, Anda menyetujui syarat dan ketentuan yang berlaku

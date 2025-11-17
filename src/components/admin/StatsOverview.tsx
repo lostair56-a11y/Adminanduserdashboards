@@ -1,18 +1,94 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { DollarSign, Users, Leaf, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { supabase } from '../../lib/supabase';
 
 export function StatsOverview() {
-  // Data will be fetched from backend
-  const totalFees = 0;
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalFees: 0,
+    totalResidents: 0,
+    totalWasteBankBalance: 0,
+    paidCount: 0,
+    unpaidCount: 0,
+    participationRate: 0,
+  });
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      // Get current month and year
+      const now = new Date();
+      const currentMonth = now.toLocaleDateString('id-ID', { month: 'long' });
+      const currentYear = now.getFullYear();
+
+      // Count total residents
+      const { count: residentsCount } = await supabase
+        .from('resident_profiles')
+        .select('*', { count: 'exact', head: true });
+
+      // Get payment data for current month
+      const { data: payments } = await supabase
+        .from('fee_payments')
+        .select('id, resident_id, amount, month, year, status, payment_date, payment_method, created_at')
+        .eq('month', currentMonth)
+        .eq('year', currentYear);
+
+      // Calculate paid and unpaid
+      const paidPayments = payments?.filter(p => p.status === 'paid') || [];
+      const unpaidPayments = payments?.filter(p => p.status === 'unpaid') || [];
+
+      // Calculate total fees collected
+      const totalFees = paidPayments.reduce((sum, p) => sum + p.amount, 0);
+
+      // Get total waste bank balance
+      const { data: residents } = await supabase
+        .from('resident_profiles')
+        .select('waste_bank_balance');
+      
+      const totalWasteBankBalance = residents?.reduce((sum, r) => sum + (r.waste_bank_balance || 0), 0) || 0;
+
+      // Calculate participation rate (residents with waste deposits this month)
+      const { count: depositsCount } = await supabase
+        .from('waste_deposits')
+        .select('resident_id', { count: 'exact', head: true })
+        .gte('date', `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
+
+      const participationRate = residentsCount ? Math.round((depositsCount || 0) / residentsCount * 100) : 0;
+
+      setStats({
+        totalFees,
+        totalResidents: residentsCount || 0,
+        totalWasteBankBalance,
+        paidCount: paidPayments.length,
+        unpaidCount: unpaidPayments.length,
+        participationRate,
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const paymentStatusData = [
-    { name: 'Lunas', value: 0, count: 0 },
-    { name: 'Belum Bayar', value: 0, count: 0 },
+    { name: 'Lunas', value: stats.paidCount, count: stats.paidCount },
+    { name: 'Belum Bayar', value: stats.unpaidCount, count: stats.unpaidCount },
   ];
-  const totalWasteBankBalance = 0;
-  const participationData: { month: string; participants: number }[] = [];
 
   const COLORS = ['#22c55e', '#ef4444'];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -24,8 +100,8 @@ export function StatsOverview() {
             <DollarSign className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">Rp {totalFees.toLocaleString('id-ID')}</div>
-            <p className="text-xs text-gray-600 mt-1">November 2024</p>
+            <div className="text-2xl">Rp {stats.totalFees.toLocaleString('id-ID')}</div>
+            <p className="text-xs text-gray-600 mt-1">{new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
           </CardContent>
         </Card>
 
@@ -35,7 +111,7 @@ export function StatsOverview() {
             <Users className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">0 KK</div>
+            <div className="text-2xl">{stats.totalResidents} KK</div>
             <p className="text-xs text-gray-600 mt-1">Total kepala keluarga</p>
           </CardContent>
         </Card>
@@ -46,7 +122,7 @@ export function StatsOverview() {
             <Leaf className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">Rp {totalWasteBankBalance.toLocaleString('id-ID')}</div>
+            <div className="text-2xl">Rp {stats.totalWasteBankBalance.toLocaleString('id-ID')}</div>
             <p className="text-xs text-gray-600 mt-1">Semua warga</p>
           </CardContent>
         </Card>
@@ -57,7 +133,7 @@ export function StatsOverview() {
             <TrendingUp className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">0%</div>
+            <div className="text-2xl">{stats.participationRate}%</div>
             <p className="text-xs text-gray-600 mt-1">Bulan ini</p>
           </CardContent>
         </Card>
@@ -72,81 +148,83 @@ export function StatsOverview() {
             <CardDescription>Persentase pembayaran iuran bulan ini</CardDescription>
           </CardHeader>
           <CardContent>
-            {paymentStatusData[0].count === 0 && paymentStatusData[1].count === 0 ? (
+            {stats.paidCount === 0 && stats.unpaidCount === 0 ? (
               <div className="h-[300px] flex items-center justify-center text-gray-500">
                 <div className="text-center">
                   <Users className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                   <p>Belum ada data pembayaran</p>
+                  <p className="text-xs mt-1">Tambahkan warga dan tagihan untuk melihat statistik</p>
                 </div>
               </div>
             ) : (
-              <>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={paymentStatusData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, value }) => `${name}: ${value}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {paymentStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-                  <div>
-                    <p className="text-sm text-gray-600">Lunas</p>
-                    <p className="text-xl">{paymentStatusData[0].count} warga</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Belum Bayar</p>
-                    <p className="text-xl">{paymentStatusData[1].count} warga</p>
-                  </div>
-                </div>
-              </>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={paymentStatusData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={(entry) => `${entry.name}: ${entry.count}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {paymentStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
 
-        {/* Participation Bar Chart */}
+        {/* Quick Info */}
         <Card>
           <CardHeader>
-            <CardTitle>Partisipasi Bank Sampah</CardTitle>
-            <CardDescription>Jumlah warga aktif menyetor sampah per bulan</CardDescription>
+            <CardTitle>Ringkasan Bulan Ini</CardTitle>
+            <CardDescription>Informasi penting RT</CardDescription>
           </CardHeader>
           <CardContent>
-            {participationData.length === 0 ? (
-              <div className="h-[300px] flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <Leaf className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                  <p>Belum ada data partisipasi</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center">
+                    <DollarSign className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Pembayaran Lunas</p>
+                    <p className="text-lg">{stats.paidCount} Warga</p>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={participationData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="participants" fill="#22c55e" name="Warga Aktif" />
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-600">Rata-rata partisipasi</p>
-                  <p className="text-xl">0 warga/bulan</p>
+
+              <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-red-500 flex items-center justify-center">
+                    <DollarSign className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Belum Bayar</p>
+                    <p className="text-lg">{stats.unpaidCount} Warga</p>
+                  </div>
                 </div>
-              </>
-            )}
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                    <Leaf className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Partisipasi Bank Sampah</p>
+                    <p className="text-lg">{stats.participationRate}% Warga</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

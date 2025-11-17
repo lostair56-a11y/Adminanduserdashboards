@@ -1,20 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { supabase } from '../../lib/supabase';
+import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { toast } from 'sonner';
 
 interface AddWasteDepositDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (deposit: {
-    residentName: string;
-    date: string;
-    wasteType: string;
-    weight: number;
-    pricePerKg: number;
-  }) => void;
+  onAdd: () => void;
 }
 
 const wasteTypes = [
@@ -25,14 +22,51 @@ const wasteTypes = [
   { value: 'Kardus', price: 2500 },
 ];
 
+interface Resident {
+  id: string;
+  name: string;
+  house_number: string;
+}
+
 export function AddWasteDepositDialog({ open, onOpenChange, onAdd }: AddWasteDepositDialogProps) {
+  const [residents, setResidents] = useState<Resident[]>([]);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    residentName: '',
-    date: new Date().toISOString().split('T')[0],
+    residentId: '',
     wasteType: '',
     weight: 0,
     pricePerKg: 0,
   });
+
+  useEffect(() => {
+    if (open) {
+      fetchResidents();
+    }
+  }, [open]);
+
+  const fetchResidents = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/residents`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setResidents(data.residents || []);
+      }
+    } catch (error) {
+      console.error('Error fetching residents:', error);
+    }
+  };
 
   const handleWasteTypeChange = (value: string) => {
     const wasteType = wasteTypes.find((w) => w.value === value);
@@ -43,16 +77,55 @@ export function AddWasteDepositDialog({ open, onOpenChange, onAdd }: AddWasteDep
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd(formData);
-    setFormData({
-      residentName: '',
-      date: new Date().toISOString().split('T')[0],
-      wasteType: '',
-      weight: 0,
-      pricePerKg: 0,
-    });
+    setLoading(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Sesi berakhir, silakan login kembali');
+        return;
+      }
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/wastebank/deposit`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            resident_id: formData.residentId,
+            waste_type: formData.wasteType,
+            weight: formData.weight,
+            price_per_kg: formData.pricePerKg
+          })
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(`Setoran berhasil ditambahkan. Saldo baru: Rp ${data.newBalance.toLocaleString('id-ID')}`);
+        setFormData({
+          residentId: '',
+          wasteType: '',
+          weight: 0,
+          pricePerKg: 0,
+        });
+        onAdd();
+        onOpenChange(false);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Gagal menambahkan setoran');
+      }
+    } catch (error) {
+      console.error('Error adding deposit:', error);
+      toast.error('Terjadi kesalahan saat menambahkan setoran');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const totalValue = formData.weight * formData.pricePerKg;
@@ -66,24 +139,19 @@ export function AddWasteDepositDialog({ open, onOpenChange, onAdd }: AddWasteDep
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="residentName">Nama Warga</Label>
-            <Input
-              id="residentName"
-              value={formData.residentName}
-              onChange={(e) => setFormData({ ...formData, residentName: e.target.value })}
-              placeholder="Masukkan nama warga"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="date">Tanggal</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              required
-            />
+            <Label htmlFor="resident">Nama Warga</Label>
+            <Select value={formData.residentId} onValueChange={(value) => setFormData({ ...formData, residentId: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih warga" />
+              </SelectTrigger>
+              <SelectContent>
+                {residents.map((resident) => (
+                  <SelectItem key={resident.id} value={resident.id}>
+                    {resident.name} - Rumah {resident.house_number}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <Label htmlFor="wasteType">Jenis Sampah</Label>
@@ -122,8 +190,8 @@ export function AddWasteDepositDialog({ open, onOpenChange, onAdd }: AddWasteDep
             <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               Batal
             </Button>
-            <Button type="submit" className="flex-1">
-              Tambah Setoran
+            <Button type="submit" className="flex-1" disabled={loading}>
+              {loading ? 'Menyimpan...' : 'Tambah Setoran'}
             </Button>
           </div>
         </form>

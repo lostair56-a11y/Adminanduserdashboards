@@ -1,30 +1,112 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { User, Mail, Phone, MapPin, Save, Home } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import type { ResidentProfile as ResidentProfileType } from '../../lib/supabase';
+import { toast } from 'sonner';
 
 export function ResidentProfile() {
+  const { profile, user } = useAuth();
+  const residentProfile = profile as ResidentProfileType;
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: 'Budi Santoso',
-    houseNumber: 'No. 15',
-    rt: '003',
-    rw: '005',
-    email: 'budi.santoso@email.com',
-    phone: '081234567890',
-    address: 'Jl. Mawar No. 15',
-    kelurahan: 'Kelurahan Mawar',
-    kecamatan: 'Kecamatan Melati',
-    kota: 'Kota Bandung',
+    name: '',
+    houseNumber: '',
+    phone: '',
+    address: '',
+    kelurahan: '',
+    kecamatan: '',
+    kota: '',
   });
 
-  const handleSave = () => {
-    // Save to backend
-    alert('Profil berhasil diperbarui!');
-    setIsEditing(false);
+  useEffect(() => {
+    if (residentProfile) {
+      setFormData({
+        name: residentProfile.name || '',
+        houseNumber: residentProfile.house_number || '',
+        phone: residentProfile.phone || '',
+        address: residentProfile.address || '',
+        kelurahan: residentProfile.kelurahan || '',
+        kecamatan: residentProfile.kecamatan || '',
+        kota: residentProfile.kota || '',
+      });
+    }
+  }, [residentProfile]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('resident_profiles')
+        .update({
+          name: formData.name,
+          house_number: formData.houseNumber,
+          phone: formData.phone,
+          address: formData.address,
+          kelurahan: formData.kelurahan,
+          kecamatan: formData.kecamatan,
+          kota: formData.kota,
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast.success('Profil berhasil diperbarui!');
+      setIsEditing(false);
+      
+      // Reload to refresh profile data
+      window.location.reload();
+    } catch (error: any) {
+      toast.error('Gagal memperbarui profil: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const handleChangePassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const newPassword = (form.elements.namedItem('new-password') as HTMLInputElement).value;
+    const confirmPassword = (form.elements.namedItem('confirm-password') as HTMLInputElement).value;
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Kata sandi baru tidak cocok');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('Kata sandi minimal 6 karakter');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success('Kata sandi berhasil diubah!');
+      form.reset();
+    } catch (error: any) {
+      toast.error('Gagal mengubah kata sandi: ' + error.message);
+    }
+  };
+
+  if (!residentProfile) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -40,7 +122,8 @@ export function ResidentProfile() {
             </div>
             <div>
               <h2>{formData.name}</h2>
-              <p className="text-gray-600">RT {formData.rt}/RW {formData.rw}</p>
+              <p className="text-gray-600">RT {residentProfile.rt}/RW {residentProfile.rw}</p>
+              <p className="text-sm text-gray-500 mt-1">{formData.houseNumber}</p>
             </div>
           </div>
 
@@ -78,20 +161,22 @@ export function ResidentProfile() {
                 <Label htmlFor="rt">RT</Label>
                 <Input
                   id="rt"
-                  value={formData.rt}
-                  onChange={(e) => setFormData({ ...formData, rt: e.target.value })}
-                  disabled={!isEditing}
+                  value={residentProfile.rt}
+                  disabled
+                  className="bg-gray-50"
                 />
+                <p className="text-xs text-gray-500 mt-1">RT tidak dapat diubah</p>
               </div>
 
               <div>
                 <Label htmlFor="rw">RW</Label>
                 <Input
                   id="rw"
-                  value={formData.rw}
-                  onChange={(e) => setFormData({ ...formData, rw: e.target.value })}
-                  disabled={!isEditing}
+                  value={residentProfile.rw}
+                  disabled
+                  className="bg-gray-50"
                 />
+                <p className="text-xs text-gray-500 mt-1">RW tidak dapat diubah</p>
               </div>
 
               <div>
@@ -101,12 +186,12 @@ export function ResidentProfile() {
                   <Input
                     id="email"
                     type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    disabled={!isEditing}
-                    className="pl-10"
+                    value={residentProfile.email}
+                    disabled
+                    className="pl-10 bg-gray-50"
                   />
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Email tidak dapat diubah</p>
               </div>
 
               <div>
@@ -146,10 +231,8 @@ export function ResidentProfile() {
                   value={formData.kelurahan}
                   onChange={(e) => setFormData({ ...formData, kelurahan: e.target.value })}
                   disabled={!isEditing}
-                  className="mt-1"
                 />
               </div>
-
               <div>
                 <Label htmlFor="kecamatan">Kecamatan</Label>
                 <Input
@@ -157,10 +240,8 @@ export function ResidentProfile() {
                   value={formData.kecamatan}
                   onChange={(e) => setFormData({ ...formData, kecamatan: e.target.value })}
                   disabled={!isEditing}
-                  className="mt-1"
                 />
               </div>
-
               <div>
                 <Label htmlFor="kota">Kota</Label>
                 <Input
@@ -168,7 +249,6 @@ export function ResidentProfile() {
                   value={formData.kota}
                   onChange={(e) => setFormData({ ...formData, kota: e.target.value })}
                   disabled={!isEditing}
-                  className="mt-1"
                 />
               </div>
             </div>
@@ -176,12 +256,12 @@ export function ResidentProfile() {
             <div className="flex gap-3 pt-4">
               {isEditing ? (
                 <>
-                  <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1">
+                  <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1" disabled={isLoading}>
                     Batal
                   </Button>
-                  <Button onClick={handleSave} className="flex-1">
+                  <Button onClick={handleSave} className="flex-1" disabled={isLoading}>
                     <Save className="h-4 w-4 mr-2" />
-                    Simpan Perubahan
+                    {isLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
                   </Button>
                 </>
               ) : (
@@ -200,21 +280,17 @@ export function ResidentProfile() {
           <CardDescription>Ubah kata sandi akun Anda</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="current-password">Kata Sandi Saat Ini</Label>
-              <Input id="current-password" type="password" className="mt-1" />
-            </div>
+          <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
               <Label htmlFor="new-password">Kata Sandi Baru</Label>
-              <Input id="new-password" type="password" className="mt-1" />
+              <Input id="new-password" name="new-password" type="password" className="mt-1" required />
             </div>
             <div>
               <Label htmlFor="confirm-password">Konfirmasi Kata Sandi Baru</Label>
-              <Input id="confirm-password" type="password" className="mt-1" />
+              <Input id="confirm-password" name="confirm-password" type="password" className="mt-1" required />
             </div>
-            <Button className="w-full">Ubah Kata Sandi</Button>
-          </div>
+            <Button type="submit" className="w-full">Ubah Kata Sandi</Button>
+          </form>
         </CardContent>
       </Card>
     </div>
