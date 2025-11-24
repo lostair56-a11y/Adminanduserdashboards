@@ -71,8 +71,11 @@ export function ResidentDashboard() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.access_token) {
+        console.log('No session or access token found');
         return;
       }
+
+      console.log('Fetching fees for user:', user?.id);
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees`,
@@ -84,12 +87,21 @@ export function ResidentDashboard() {
         }
       );
 
+      console.log('Fees response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('Fees data received:', data);
+        console.log('Number of fees:', data.fees?.length || 0);
         setFees(data.fees || []);
+      } else {
+        const errorData = await response.json();
+        console.error('Error response from server:', errorData);
+        toast.error('Gagal memuat tagihan: ' + (errorData.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error fetching fees:', error);
+      toast.error('Gagal memuat tagihan');
     } finally {
       setLoading(false);
     }
@@ -421,7 +433,7 @@ export function ResidentDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-white">Dashboard</h2>
-                <p className="text-sm text-green-200">RT 003/RW 005</p>
+                <p className="text-sm text-green-200">RT {residentProfile?.rt || '0'} / RW {residentProfile?.rw || '0'}</p>
               </div>
               <Button
                 variant="ghost"

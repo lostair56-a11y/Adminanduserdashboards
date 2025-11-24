@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Plus } from 'lucide-react';
 import { AddWasteDepositDialog } from './AddWasteDepositDialog';
-import { supabase } from '../../lib/supabase';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { useAuth } from '../../contexts/AuthContext';
+import { projectId } from '../../utils/supabase/info';
 
 interface WasteDeposit {
   id: string;
@@ -14,8 +14,8 @@ interface WasteDeposit {
   weight: number;
   price_per_kg: number;
   total_value: number;
-  deposit_date: string;
-  resident: {
+  date: string;
+  resident?: {
     name: string;
     house_number: string;
   };
@@ -38,10 +38,13 @@ export function ManageWasteBank() {
     month: new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
   });
   const [loading, setLoading] = useState(true);
+  const { session } = useAuth();
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (session?.access_token) {
+      fetchData();
+    }
+  }, [session]);
 
   const fetchData = async () => {
     await Promise.all([fetchDeposits(), fetchStats()]);
@@ -50,8 +53,7 @@ export function ManageWasteBank() {
 
   const fetchDeposits = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session?.access_token) return;
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/wastebank/deposits`,
@@ -65,7 +67,6 @@ export function ManageWasteBank() {
 
       if (response.ok) {
         const data = await response.json();
-        // Filter only deposits with positive values (exclude payments)
         const actualDeposits = (data.deposits || []).filter((d: WasteDeposit) => d.total_value > 0);
         setDeposits(actualDeposits);
       }
@@ -76,8 +77,7 @@ export function ManageWasteBank() {
 
   const fetchStats = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session?.access_token) return;
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/wastebank/stats`,
@@ -100,7 +100,6 @@ export function ManageWasteBank() {
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
       <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -133,7 +132,6 @@ export function ManageWasteBank() {
         </Card>
       </div>
 
-      {/* Deposits Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -169,13 +167,13 @@ export function ManageWasteBank() {
                   {deposits.map((deposit) => (
                     <TableRow key={deposit.id}>
                       <TableCell>
-                        {new Date(deposit.deposit_date).toLocaleDateString('id-ID', {
+                        {new Date(deposit.date).toLocaleDateString('id-ID', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
                         })}
                       </TableCell>
-                      <TableCell>{deposit.resident.name}</TableCell>
+                      <TableCell>{deposit.resident?.name || 'Unknown'}</TableCell>
                       <TableCell>{deposit.waste_type}</TableCell>
                       <TableCell>{deposit.weight} kg</TableCell>
                       <TableCell>Rp {deposit.price_per_kg.toLocaleString('id-ID')}</TableCell>

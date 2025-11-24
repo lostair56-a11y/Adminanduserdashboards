@@ -1,14 +1,40 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Input } from '../ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Plus, Search, Edit, Trash2, Mail, Phone, Home, Wallet } from 'lucide-react';
+import { Input } from '../ui/input';
 import { AddResidentDialog } from './AddResidentDialog';
 import { EditResidentDialog } from './EditResidentDialog';
 import { supabase } from '../../lib/supabase';
-import type { ResidentProfile } from '../../lib/supabase';
-import { toast } from 'sonner';
+import { projectId } from '../../utils/supabase/info';
+import { toast } from 'sonner@2.0.3';
+import { Search, UserPlus, Edit, Trash2, Loader2, Home, Phone, Mail, Wallet, AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+
+interface ResidentProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  house_number: string;
+  address: string;
+  rt: string;
+  rw: string;
+  kelurahan: string;
+  kecamatan: string;
+  kota: string;
+  waste_bank_balance: number;
+  created_at?: string;
+}
 
 export function ManageResidents() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -16,6 +42,8 @@ export function ManageResidents() {
   const [editingResident, setEditingResident] = useState<ResidentProfile | null>(null);
   const [residents, setResidents] = useState<ResidentProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteResident, setDeleteResident] = useState<ResidentProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadResidents();
@@ -23,15 +51,33 @@ export function ManageResidents() {
 
   const loadResidents = async () => {
     try {
-      const { data, error } = await supabase
-        .from('resident_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        toast.error('Sesi tidak valid. Silakan login kembali.');
+        return;
+      }
 
-      if (error) throw error;
-      setResidents(data || []);
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/residents`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Gagal mengambil data warga');
+      }
+
+      const data = await response.json();
+      setResidents(data.residents || []);
     } catch (error: any) {
-      toast.error('Gagal memuat data warga: ' + error.message);
+      console.error('Error fetching residents:', error);
+      toast.error(error.message || 'Gagal mengambil data warga');
     } finally {
       setLoading(false);
     }
@@ -45,22 +91,39 @@ export function ManageResidents() {
   );
 
   const handleDelete = async (resident: ResidentProfile) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus data warga "${resident.name}"? Ini akan menghapus semua data terkait termasuk pembayaran dan riwayat bank sampah.`)) {
-      return;
-    }
-
+    setDeleting(true);
     try {
-      const { error } = await supabase
-        .from('resident_profiles')
-        .delete()
-        .eq('id', resident.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        toast.error('Sesi tidak valid. Silakan login kembali.');
+        return;
+      }
 
-      if (error) throw error;
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/residents/${resident.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-      toast.success('Data warga berhasil dihapus');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Gagal menghapus data warga');
+      }
+
+      toast.success(`Data warga "${resident.name}" berhasil dihapus`);
+      setDeleteResident(null);
       loadResidents();
     } catch (error: any) {
-      toast.error('Gagal menghapus data warga: ' + error.message);
+      console.error('Error deleting resident:', error);
+      toast.error(error.message || 'Gagal menghapus data warga');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -82,7 +145,7 @@ export function ManageResidents() {
               <CardDescription>Kelola data seluruh warga RT ({residents.length} warga)</CardDescription>
             </div>
             <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <UserPlus className="h-4 w-4 mr-2" />
               Tambah Warga
             </Button>
           </div>
@@ -192,7 +255,7 @@ export function ManageResidents() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDelete(resident)}
+                            onClick={() => setDeleteResident(resident)}
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -221,6 +284,36 @@ export function ManageResidents() {
           resident={editingResident}
           onSuccess={loadResidents}
         />
+      )}
+
+      {deleteResident && (
+        <AlertDialog open={!!deleteResident} onOpenChange={(open) => !open && setDeleteResident(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Hapus Data Warga</AlertDialogTitle>
+              <AlertDialogDescription>
+                Apakah Anda yakin ingin menghapus data warga "{deleteResident.name}"? Ini akan menghapus semua data terkait termasuk pembayaran dan riwayat bank sampah.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Batal</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleDelete(deleteResident)}
+                className="bg-red-600 hover:bg-red-700"
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Menghapus...
+                  </>
+                ) : (
+                  'Hapus'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

@@ -4,8 +4,22 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { supabase } from '../../lib/supabase';
-import type { ResidentProfile } from '../../lib/supabase';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
+
+interface ResidentProfile {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  house_number: string;
+  address: string;
+  rt: string;
+  rw: string;
+  kelurahan: string;
+  kecamatan: string;
+  kota: string;
+  waste_bank_balance: number;
+}
 
 interface EditResidentDialogProps {
   open: boolean;
@@ -15,14 +29,15 @@ interface EditResidentDialogProps {
 }
 
 export function EditResidentDialog({ open, onOpenChange, resident, onSuccess }: EditResidentDialogProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    houseNumber: '',
+    email: '',
+    phone: '',
+    house_number: '',
+    address: '',
     rt: '',
     rw: '',
-    phone: '',
-    address: '',
     kelurahan: '',
     kecamatan: '',
     kota: '',
@@ -32,11 +47,12 @@ export function EditResidentDialog({ open, onOpenChange, resident, onSuccess }: 
     if (resident) {
       setFormData({
         name: resident.name,
-        houseNumber: resident.house_number,
+        email: resident.email,
+        phone: resident.phone,
+        house_number: resident.house_number,
+        address: resident.address,
         rt: resident.rt,
         rw: resident.rw,
-        phone: resident.phone,
-        address: resident.address,
         kelurahan: resident.kelurahan,
         kecamatan: resident.kecamatan,
         kota: resident.kota,
@@ -46,33 +62,23 @@ export function EditResidentDialog({ open, onOpenChange, resident, onSuccess }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
 
     try {
       const { error } = await supabase
         .from('resident_profiles')
-        .update({
-          name: formData.name,
-          house_number: formData.houseNumber,
-          rt: formData.rt,
-          rw: formData.rw,
-          phone: formData.phone,
-          address: formData.address,
-          kelurahan: formData.kelurahan,
-          kecamatan: formData.kecamatan,
-          kota: formData.kota,
-        })
+        .update(formData)
         .eq('id', resident.id);
 
       if (error) throw error;
 
-      toast.success('Data warga berhasil diperbarui!');
+      toast.success('Data warga berhasil diperbarui');
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      toast.error('Gagal memperbarui data: ' + error.message);
+      toast.error('Gagal memperbarui data warga: ' + error.message);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -84,41 +90,60 @@ export function EditResidentDialog({ open, onOpenChange, resident, onSuccess }: 
           <DialogDescription>Perbarui informasi warga</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">Email: {resident.email}</p>
-            <p className="text-xs text-gray-500 mt-1">Email tidak dapat diubah</p>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-sm">Informasi Personal</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="name">Nama Lengkap *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="houseNumber">Nomor Rumah *</Label>
-                <Input
-                  id="houseNumber"
-                  value={formData.houseNumber}
-                  onChange={(e) => setFormData({ ...formData, houseNumber: e.target.value })}
-                  required
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Label htmlFor="name">Nama Lengkap *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Nama lengkap"
+                required
+              />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="email@example.com"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="phone">No. Telepon *</Label>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="08xxxxxxxxxx"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="house_number">No. Rumah *</Label>
+              <Input
+                id="house_number"
+                value={formData.house_number}
+                onChange={(e) => setFormData({ ...formData, house_number: e.target.value })}
+                placeholder="123"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label htmlFor="rt">RT *</Label>
                 <Input
                   id="rt"
                   value={formData.rt}
                   onChange={(e) => setFormData({ ...formData, rt: e.target.value })}
+                  placeholder="003"
                   required
                 />
               </div>
@@ -128,70 +153,63 @@ export function EditResidentDialog({ open, onOpenChange, resident, onSuccess }: 
                   id="rw"
                   value={formData.rw}
                   onChange={(e) => setFormData({ ...formData, rw: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">No. Telepon *</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="005"
                   required
                 />
               </div>
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <h3 className="text-sm">Alamat</h3>
-            <div>
+            <div className="col-span-2">
               <Label htmlFor="address">Alamat Lengkap *</Label>
               <Input
                 id="address"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Jl. Contoh No. 123"
                 required
               />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <Label htmlFor="kelurahan">Kelurahan *</Label>
-                <Input
-                  id="kelurahan"
-                  value={formData.kelurahan}
-                  onChange={(e) => setFormData({ ...formData, kelurahan: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="kecamatan">Kecamatan *</Label>
-                <Input
-                  id="kecamatan"
-                  value={formData.kecamatan}
-                  onChange={(e) => setFormData({ ...formData, kecamatan: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="kota">Kota *</Label>
-                <Input
-                  id="kota"
-                  value={formData.kota}
-                  onChange={(e) => setFormData({ ...formData, kota: e.target.value })}
-                  required
-                />
-              </div>
+            <div>
+              <Label htmlFor="kelurahan">Kelurahan *</Label>
+              <Input
+                id="kelurahan"
+                value={formData.kelurahan}
+                onChange={(e) => setFormData({ ...formData, kelurahan: e.target.value })}
+                placeholder="Kelurahan"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="kecamatan">Kecamatan *</Label>
+              <Input
+                id="kecamatan"
+                value={formData.kecamatan}
+                onChange={(e) => setFormData({ ...formData, kecamatan: e.target.value })}
+                placeholder="Kecamatan"
+                required
+              />
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="kota">Kota/Kabupaten *</Label>
+              <Input
+                id="kota"
+                value={formData.kota}
+                onChange={(e) => setFormData({ ...formData, kota: e.target.value })}
+                placeholder="Kota"
+                required
+              />
             </div>
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1" disabled={isLoading}>
+            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               Batal
             </Button>
-            <Button type="submit" className="flex-1" disabled={isLoading}>
-              {isLoading ? 'Menyimpan...' : 'Simpan Perubahan'}
+            <Button type="submit" className="flex-1" disabled={loading}>
+              {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
             </Button>
           </div>
         </form>

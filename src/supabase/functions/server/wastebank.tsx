@@ -53,7 +53,7 @@ export async function addWasteDeposit(c: Context) {
         weight,
         price_per_kg,
         total_value,
-        deposit_date: new Date().toISOString()
+        date: new Date().toISOString()
       })
       .select()
       .single();
@@ -104,7 +104,7 @@ export async function addWasteDeposit(c: Context) {
   }
 }
 
-// Get waste deposits
+// Get waste deposits for a resident or all residents (Admin only)
 export async function getWasteDeposits(c: Context) {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -115,43 +115,64 @@ export async function getWasteDeposits(c: Context) {
     if (authError || !user) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-    
-    const residentId = c.req.param('residentId');
-    
-    // Check if user is admin
-    const { data: adminProfile } = await supabase
+
+    // Get admin profile to get their location
+    const { data: adminProfile, error: adminError } = await supabase
       .from('admin_profiles')
-      .select('id')
+      .select('rt, rw')
       .eq('id', user.id)
       .single();
+
+    let residentIds: string[] = [];
+
+    if (adminProfile) {
+      // Admin: Get only residents from same RT/RW
+      const { data: residents, error: residentsError } = await supabase
+        .from('resident_profiles')
+        .select('id')
+        .eq('rt', adminProfile.rt)
+        .eq('rw', adminProfile.rw);
+
+      if (residentsError) {
+        console.error('Error fetching residents:', residentsError);
+        return c.json({ error: residentsError.message }, 400);
+      }
+
+      residentIds = residents?.map(r => r.id) || [];
+    } else {
+      // Resident: Get their own deposits
+      residentIds = [user.id];
+    }
+
+    if (residentIds.length === 0) {
+      return c.json({ deposits: [] });
+    }
+
+    const residentId = c.req.param('residentId');
     
     let query = supabase
       .from('waste_deposits')
       .select(`
         *,
-        resident:resident_profiles!resident_id (
+        resident:resident_profiles!waste_deposits_resident_id_fkey (
           name,
           house_number
         )
-      `);
-    
-    if (adminProfile) {
-      // Admin can see all or specific resident
-      if (residentId) {
-        query = query.eq('resident_id', residentId);
-      }
-    } else {
-      // Resident can only see their own
-      query = query.eq('resident_id', user.id);
+      `)
+      .in('resident_id', residentIds)
+      .order('date', { ascending: false });
+
+    if (residentId && residentId !== 'undefined') {
+      query = query.eq('resident_id', residentId);
     }
-    
-    const { data: deposits, error: depositsError } = await query.order('deposit_date', { ascending: false });
-    
-    if (depositsError) {
-      console.error('Error fetching waste deposits:', depositsError);
-      return c.json({ error: depositsError.message }, 400);
+
+    const { data: deposits, error } = await query;
+
+    if (error) {
+      console.error('Error fetching waste deposits:', error);
+      return c.json({ error: error.message }, 400);
     }
-    
+
     return c.json({ deposits });
   } catch (error) {
     console.error('Error in get waste deposits:', error);
@@ -248,7 +269,7 @@ export async function payFeeWithWasteBank(c: Context) {
         weight: 0,
         price_per_kg: 0,
         total_value: -fee.amount,
-        deposit_date: new Date().toISOString()
+        date: new Date().toISOString()
       });
     
     // Create notification
@@ -316,7 +337,7 @@ export async function getWasteBankStats(c: Context) {
     const { data: monthlyDeposits, error: depositsError } = await supabase
       .from('waste_deposits')
       .select('*')
-      .gte('deposit_date', startOfMonth)
+      .gte('date', startOfMonth)
       .gt('total_value', 0); // Only positive values (actual deposits, not payments)
     
     if (depositsError) {
@@ -338,6 +359,175 @@ export async function getWasteBankStats(c: Context) {
     });
   } catch (error) {
     console.error('Error in get waste bank stats:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+
+// Update waste deposit (Admin only)
+export async function updateWasteDeposit(c: Context) {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
+    // Verify admin access
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Check if user is admin
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('admin_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+    
+    if (adminError || !adminProfile) {
+      return c.json({ error: 'Unauthorized - Admin access required' }, 403);
+    }
+    
+    const depositId = c.req.param('id');
+    const body = await c.req.json();
+    const { waste_type, weight, price_per_kg } = body;
+    
+    if (!waste_type || !weight || !price_per_kg) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+    
+    // Get old deposit to calculate balance difference
+    const { data: oldDeposit, error: oldDepositError } = await supabase
+      .from('waste_deposits')
+      .select('*, resident_id, total_value')
+      .eq('id', depositId)
+      .single();
+    
+    if (oldDepositError || !oldDeposit) {
+      return c.json({ error: 'Deposit not found' }, 404);
+    }
+    
+    const newTotalValue = weight * price_per_kg;
+    const balanceDiff = newTotalValue - oldDeposit.total_value;
+    
+    // Update deposit
+    const { data: updatedDeposit, error: updateError } = await supabase
+      .from('waste_deposits')
+      .update({
+        waste_type,
+        weight,
+        price_per_kg,
+        total_value: newTotalValue
+      })
+      .eq('id', depositId)
+      .select()
+      .single();
+    
+    if (updateError) {
+      console.error('Error updating deposit:', updateError);
+      return c.json({ error: updateError.message }, 400);
+    }
+    
+    // Update resident's balance
+    const { data: residentProfile, error: profileError } = await supabase
+      .from('resident_profiles')
+      .select('waste_bank_balance')
+      .eq('id', oldDeposit.resident_id)
+      .single();
+    
+    if (profileError) {
+      return c.json({ error: profileError.message }, 400);
+    }
+    
+    const newBalance = (residentProfile.waste_bank_balance || 0) + balanceDiff;
+    
+    const { error: balanceError } = await supabase
+      .from('resident_profiles')
+      .update({ waste_bank_balance: newBalance })
+      .eq('id', oldDeposit.resident_id);
+    
+    if (balanceError) {
+      console.error('Error updating balance:', balanceError);
+      return c.json({ error: balanceError.message }, 400);
+    }
+    
+    return c.json({ success: true, deposit: updatedDeposit, newBalance });
+  } catch (error) {
+    console.error('Error in update waste deposit:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+
+// Delete waste deposit (Admin only)
+export async function deleteWasteDeposit(c: Context) {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
+    // Verify admin access
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Check if user is admin
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('admin_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+    
+    if (adminError || !adminProfile) {
+      return c.json({ error: 'Unauthorized - Admin access required' }, 403);
+    }
+    
+    const depositId = c.req.param('id');
+    
+    // Get deposit to subtract from balance
+    const { data: deposit, error: depositError } = await supabase
+      .from('waste_deposits')
+      .select('resident_id, total_value')
+      .eq('id', depositId)
+      .single();
+    
+    if (depositError || !deposit) {
+      return c.json({ error: 'Deposit not found' }, 404);
+    }
+    
+    // Update resident's balance (subtract the deposit value)
+    const { data: residentProfile, error: profileError } = await supabase
+      .from('resident_profiles')
+      .select('waste_bank_balance')
+      .eq('id', deposit.resident_id)
+      .single();
+    
+    if (profileError) {
+      return c.json({ error: profileError.message }, 400);
+    }
+    
+    const newBalance = (residentProfile.waste_bank_balance || 0) - deposit.total_value;
+    
+    const { error: balanceError } = await supabase
+      .from('resident_profiles')
+      .update({ waste_bank_balance: newBalance >= 0 ? newBalance : 0 })
+      .eq('id', deposit.resident_id);
+    
+    if (balanceError) {
+      console.error('Error updating balance:', balanceError);
+    }
+    
+    // Delete deposit
+    const { error: deleteError } = await supabase
+      .from('waste_deposits')
+      .delete()
+      .eq('id', depositId);
+    
+    if (deleteError) {
+      console.error('Error deleting deposit:', deleteError);
+      return c.json({ error: deleteError.message }, 400);
+    }
+    
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error in delete waste deposit:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 }

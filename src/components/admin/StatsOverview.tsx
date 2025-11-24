@@ -21,20 +21,54 @@ export function StatsOverview() {
 
   const loadStats = async () => {
     try {
+      // Get current admin's location
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        return;
+      }
+
+      const { data: adminProfile } = await supabase
+        .from('admin_profiles')
+        .select('rt, rw')
+        .eq('id', user.id)
+        .single();
+
+      if (!adminProfile) {
+        return;
+      }
+
       // Get current month and year
       const now = new Date();
       const currentMonth = now.toLocaleDateString('id-ID', { month: 'long' });
       const currentYear = now.getFullYear();
 
-      // Count total residents
-      const { count: residentsCount } = await supabase
+      // Count total residents in same location as admin
+      const { data: residents, count: residentsCount } = await supabase
         .from('resident_profiles')
-        .select('*', { count: 'exact', head: true });
+        .select('id, waste_bank_balance', { count: 'exact' })
+        .eq('rt', adminProfile.rt)
+        .eq('rw', adminProfile.rw);
 
-      // Get payment data for current month
+      const residentIds = residents?.map(r => r.id) || [];
+
+      if (residentIds.length === 0) {
+        setStats({
+          totalFees: 0,
+          totalResidents: 0,
+          totalWasteBankBalance: 0,
+          paidCount: 0,
+          unpaidCount: 0,
+          participationRate: 0,
+        });
+        return;
+      }
+
+      // Get payment data for current month (only for residents in same location)
       const { data: payments } = await supabase
         .from('fee_payments')
         .select('id, resident_id, amount, month, year, status, payment_date, payment_method, created_at')
+        .in('resident_id', residentIds)
         .eq('month', currentMonth)
         .eq('year', currentYear);
 
@@ -44,18 +78,15 @@ export function StatsOverview() {
 
       // Calculate total fees collected
       const totalFees = paidPayments.reduce((sum, p) => sum + p.amount, 0);
-
-      // Get total waste bank balance
-      const { data: residents } = await supabase
-        .from('resident_profiles')
-        .select('waste_bank_balance');
       
+      // Calculate total waste bank balance
       const totalWasteBankBalance = residents?.reduce((sum, r) => sum + (r.waste_bank_balance || 0), 0) || 0;
 
       // Calculate participation rate (residents with waste deposits this month)
       const { count: depositsCount } = await supabase
         .from('waste_deposits')
         .select('resident_id', { count: 'exact', head: true })
+        .in('resident_id', residentIds)
         .gte('date', `${currentYear}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
 
       const participationRate = residentsCount ? Math.round((depositsCount || 0) / residentsCount * 100) : 0;

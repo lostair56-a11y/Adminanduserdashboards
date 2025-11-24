@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { LayoutDashboard, Users, DollarSign, Trash2, Calendar, FileText, LogOut, Menu, X, User, Database, ClipboardCheck } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { LayoutDashboard, Users, DollarSign, Trash2, Calendar, FileText, LogOut, Menu, X, User, Database, ClipboardCheck, Bell } from 'lucide-react';
 import { StatsOverview } from './admin/StatsOverview';
 import { ManageResidents } from './admin/ManageResidents';
 import { ManageFees } from './admin/ManageFees';
@@ -9,12 +10,13 @@ import { ManageWasteBank } from './admin/ManageWasteBank';
 import { ManageSchedule } from './admin/ManageSchedule';
 import { Reports } from './admin/Reports';
 import { AdminProfile } from './admin/AdminProfile';
-import { DatabaseMigration } from './admin/DatabaseMigration';
 import { PendingPaymentsDialog } from './admin/PendingPaymentsDialog';
 import { useAuth } from '../contexts/AuthContext';
 import type { AdminProfile as AdminProfileType } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import { projectId } from '../utils/supabase/info';
 
-type MenuItem = 'dashboard' | 'residents' | 'fees' | 'wastebank' | 'schedule' | 'reports' | 'profile' | 'migration';
+type MenuItem = 'dashboard' | 'residents' | 'fees' | 'wastebank' | 'schedule' | 'reports' | 'profile';
 
 export function AdminDashboard() {
   const { signOut, profile } = useAuth();
@@ -22,6 +24,43 @@ export function AdminDashboard() {
   const [activeMenu, setActiveMenu] = useState<MenuItem>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPendingPayments, setShowPendingPayments] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    fetchPendingCount();
+    
+    // Poll every 30 seconds for new pending payments
+    const interval = setInterval(fetchPendingCount, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchPendingCount = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        return;
+      }
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/pending`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setPendingCount(data.fees?.length || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching pending count:', error);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -38,7 +77,7 @@ export function AdminDashboard() {
     { id: 'wastebank' as MenuItem, label: 'Kelola Bank Sampah', icon: Trash2 },
     { id: 'schedule' as MenuItem, label: 'Kelola Jadwal Pengangkutan', icon: Calendar },
     { id: 'reports' as MenuItem, label: 'Laporan', icon: FileText },
-    { id: 'migration' as MenuItem, label: 'Migrasi Database', icon: Database },
+    { id: 'profile' as MenuItem, label: 'Profil Admin', icon: User },
   ];
 
   const renderContent = () => {
@@ -57,8 +96,6 @@ export function AdminDashboard() {
         return <Reports />;
       case 'profile':
         return <AdminProfile />;
-      case 'migration':
-        return <DatabaseMigration />;
       default:
         return <StatsOverview />;
     }
@@ -179,13 +216,54 @@ export function AdminDashboard() {
                 </h1>
               </div>
             </div>
-            <Button
-              onClick={() => setShowPendingPayments(true)}
-              className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
-            >
-              <ClipboardCheck className="h-4 w-4 mr-2" />
-              Verifikasi Pembayaran
-            </Button>
+            <div className="flex items-center gap-4 justify-end">
+              {/* Notification Badge */}
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="relative"
+                  onClick={() => setShowPendingPayments(true)}
+                >
+                  <Bell className="h-5 w-5" />
+                  {pendingCount > 0 && (
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                    >
+                      {pendingCount}
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+
+              {/* Admin Profile Badge */}
+              <div className="hidden md:flex flex-col items-end">
+                <span className="text-sm">{adminProfile?.name || 'Admin'}</span>
+                <span className="text-xs text-gray-500">
+                  RT {adminProfile?.rt || '0'} / RW {adminProfile?.rw || '0'} - {adminProfile?.kelurahan || 'N/A'}
+                </span>
+              </div>
+
+              <Button
+                onClick={signOut}
+                variant="destructive"
+                size="sm"
+                className="hidden md:flex gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Keluar
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+              >
+                {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </Button>
+            </div>
           </div>
         </header>
 
@@ -199,6 +277,7 @@ export function AdminDashboard() {
       <PendingPaymentsDialog
         open={showPendingPayments}
         onOpenChange={setShowPendingPayments}
+        onVerificationComplete={fetchPendingCount}
       />
     </div>
   );

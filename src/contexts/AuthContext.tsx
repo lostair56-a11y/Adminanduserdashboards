@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase, AdminProfile, ResidentProfile } from '../lib/supabase';
+import { User, supabase, AdminProfile, ResidentProfile } from '../lib/supabase';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 interface AuthContextType {
   user: User | null;
   userRole: 'admin' | 'resident' | null;
   profile: AdminProfile | ResidentProfile | null;
+  session: { access_token: string; user: any } | null;
   loading: boolean;
   signIn: (email: string, password: string, role: 'admin' | 'resident') => Promise<void>;
   signUp: (
@@ -22,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   userRole: null,
   profile: null,
+  session: null,
   loading: true,
   signIn: async () => {},
   signUp: async () => {},
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'admin' | 'resident' | null>(null);
   const [profile, setProfile] = useState<AdminProfile | ResidentProfile | null>(null);
+  const [session, setSession] = useState<{ access_token: string; user: any } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         loadUserProfile(session.user.id);
+        setSession(session);
       } else {
         setLoading(false);
       }
@@ -54,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         loadUserProfile(session.user.id);
+        setSession(session);
       } else {
         setProfile(null);
         setUserRole(null);
@@ -66,14 +70,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserProfile = async (userId: string) => {
     try {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Loading user profile for:', userId);
+      }
+      
       // Try to load admin profile
-      const { data: adminData } = await supabase
+      const { data: adminData, error: adminError } = await supabase
         .from('admin_profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Admin profile query result:', { adminData, adminError });
+      }
+
       if (adminData) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('User is admin, setting profile');
+        }
         setProfile(adminData);
         setUserRole('admin');
         setLoading(false);
@@ -81,19 +96,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Try to load resident profile
-      const { data: residentData } = await supabase
+      const { data: residentData, error: residentError } = await supabase
         .from('resident_profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Resident profile query result:', { residentData, residentError });
+      }
+
       if (residentData) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('User is resident, setting profile');
+        }
         setProfile(residentData);
         setUserRole('resident');
         setLoading(false);
         return 'resident';
       }
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log('No profile found for user');
+      }
       setLoading(false);
       return null;
     } catch (error) {
@@ -111,16 +136,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (error) throw error;
 
-    if (data.user) {
+    if (data.user && data.session) {
+      setSession(data.session);
       const actualRole = await loadUserProfile(data.user.id);
       
       // Verify role matches
       if (role === 'admin' && actualRole !== 'admin') {
         await supabase.auth.signOut();
+        setSession(null);
         throw new Error('Akun ini bukan akun Admin RT');
       }
       if (role === 'resident' && actualRole !== 'resident') {
         await supabase.auth.signOut();
+        setSession(null);
         throw new Error('Akun ini bukan akun Warga');
       }
     }
@@ -193,7 +221,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Pendaftaran berhasil, tapi login gagal: ' + signInError.message);
       }
 
-      if (signInData.user) {
+      if (signInData.user && signInData.session) {
+        setSession(signInData.session);
         await loadUserProfile(signInData.user.id);
       }
     } catch (error: any) {
@@ -204,6 +233,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+    setUserRole(null);
     if (error) throw error;
   };
 
@@ -211,6 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     userRole,
     profile,
+    session,
     loading,
     signIn,
     signUp,

@@ -5,6 +5,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import * as kv from "./kv_store.tsx";
 import * as fees from "./fees.tsx";
 import * as wastebank from "./wastebank.tsx";
+import * as residents from "./residents.tsx";
+import * as schedule from "./schedule.tsx";
+import * as reports from "./reports.tsx";
 
 const app = new Hono();
 
@@ -114,7 +117,7 @@ const initializeDemoAdmin = async () => {
         }
       }
     } else {
-      console.log('Admin already exists, skipping demo admin creation');
+      console.log('Admin(s) already exist');
     }
   } catch (error) {
     console.error('Error initializing demo admin:', error);
@@ -133,6 +136,14 @@ app.post('/make-server-64eec44a/signup/admin', async (c) => {
     
     const supabase = getSupabaseClient();
     
+    // Check if email already exists in auth.users
+    const { data: existingUser } = await supabase.auth.admin.listUsers();
+    const emailExists = existingUser?.users?.some(user => user.email === email);
+    
+    if (emailExists) {
+      return c.json({ error: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' }, 400);
+    }
+    
     // Create user with auto-confirmed email
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
@@ -143,6 +154,12 @@ app.post('/make-server-64eec44a/signup/admin', async (c) => {
     
     if (authError) {
       console.error('Auth error during admin registration:', authError);
+      
+      // Handle specific error cases
+      if (authError.message.includes('already been registered') || authError.code === 'email_exists') {
+        return c.json({ error: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' }, 400);
+      }
+      
       return c.json({ error: authError.message }, 400);
     }
     
@@ -164,6 +181,10 @@ app.post('/make-server-64eec44a/signup/admin', async (c) => {
     
     if (profileError) {
       console.error('Profile error during admin registration:', profileError);
+      
+      // If profile creation fails, delete the auth user to keep data consistent
+      await supabase.auth.admin.deleteUser(authData.user.id);
+      
       return c.json({ error: profileError.message }, 400);
     }
     
@@ -182,6 +203,14 @@ app.post('/make-server-64eec44a/signup/resident', async (c) => {
     
     const supabase = getSupabaseClient();
     
+    // Check if email already exists in auth.users
+    const { data: existingUser } = await supabase.auth.admin.listUsers();
+    const emailExists = existingUser?.users?.some(user => user.email === email);
+    
+    if (emailExists) {
+      return c.json({ error: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' }, 400);
+    }
+    
     // Create user with auto-confirmed email
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
@@ -192,6 +221,12 @@ app.post('/make-server-64eec44a/signup/resident', async (c) => {
     
     if (authError) {
       console.error('Auth error during resident registration:', authError);
+      
+      // Handle specific error cases
+      if (authError.message.includes('already been registered') || authError.code === 'email_exists') {
+        return c.json({ error: 'Email sudah terdaftar. Silakan gunakan email lain atau login.' }, 400);
+      }
+      
       return c.json({ error: authError.message }, 400);
     }
     
@@ -215,6 +250,10 @@ app.post('/make-server-64eec44a/signup/resident', async (c) => {
     
     if (profileError) {
       console.error('Profile error during resident registration:', profileError);
+      
+      // If profile creation fails, delete the auth user to keep data consistent
+      await supabase.auth.admin.deleteUser(authData.user.id);
+      
       return c.json({ error: profileError.message }, 400);
     }
     
@@ -227,6 +266,8 @@ app.post('/make-server-64eec44a/signup/resident', async (c) => {
 
 // Fee management endpoints
 app.post('/make-server-64eec44a/fees/create', fees.createFee);
+app.put('/make-server-64eec44a/fees/:id', fees.updateFee);
+app.delete('/make-server-64eec44a/fees/:id', fees.deleteFee);
 app.post('/make-server-64eec44a/fees/pay', fees.payFee);
 app.get('/make-server-64eec44a/fees/pending', fees.getPendingPayments);
 app.post('/make-server-64eec44a/fees/verify', fees.verifyPayment);
@@ -234,183 +275,55 @@ app.get('/make-server-64eec44a/fees/:residentId?', fees.getFees);
 
 // Waste bank endpoints
 app.post('/make-server-64eec44a/wastebank/deposit', wastebank.addWasteDeposit);
+app.put('/make-server-64eec44a/wastebank/deposit/:id', wastebank.updateWasteDeposit);
+app.delete('/make-server-64eec44a/wastebank/deposit/:id', wastebank.deleteWasteDeposit);
 app.post('/make-server-64eec44a/wastebank/pay-fee', wastebank.payFeeWithWasteBank);
 app.get('/make-server-64eec44a/wastebank/stats', wastebank.getWasteBankStats);
 app.get('/make-server-64eec44a/wastebank/deposits/:residentId?', wastebank.getWasteDeposits);
 
-// Get all residents (Admin only)
-app.get('/make-server-64eec44a/residents', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const supabase = getSupabaseClient();
-    
-    // Verify admin access
-    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-    
-    // Check if user is admin
-    const { data: adminProfile, error: adminError } = await supabase
-      .from('admin_profiles')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-    
-    if (adminError || !adminProfile) {
-      return c.json({ error: 'Unauthorized - Admin access required' }, 403);
-    }
-    
-    // Get all residents
-    const { data: residents, error: residentsError } = await supabase
-      .from('resident_profiles')
-      .select('*')
-      .order('name');
-    
-    if (residentsError) {
-      console.error('Error fetching residents:', residentsError);
-      return c.json({ error: residentsError.message }, 400);
-    }
-    
-    return c.json({ residents });
-  } catch (error) {
-    console.error('Error in get residents:', error);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
+// Residents endpoints
+app.get('/make-server-64eec44a/residents', residents.getResidents);
+app.put('/make-server-64eec44a/residents/:id', residents.updateResident);
+app.delete('/make-server-64eec44a/residents/:id', residents.deleteResident);
 
-// Get Admin RT Bank Account Info
+// Schedule endpoints
+app.get('/make-server-64eec44a/schedules', schedule.getSchedules);
+app.get('/make-server-64eec44a/schedules/public', schedule.getPublicSchedules);
+app.post('/make-server-64eec44a/schedules/create', schedule.createSchedule);
+app.put('/make-server-64eec44a/schedules/:id', schedule.updateSchedule);
+app.delete('/make-server-64eec44a/schedules/:id', schedule.deleteSchedule);
+
+// Admin bank account endpoint
 app.get('/make-server-64eec44a/admin/bank-account', async (c) => {
   try {
     const supabase = getSupabaseClient();
     
-    // Get the first admin's bank account (in production, this would be based on RT/RW)
-    const { data: adminProfiles, error: adminError } = await supabase
+    // Get the first admin's bank account info
+    const { data: admin, error } = await supabase
       .from('admin_profiles')
-      .select('bri_account_number, bri_account_name, name, rt, rw')
-      .limit(1);
+      .select('bri_account_number, bri_account_name, name')
+      .limit(1)
+      .single();
     
-    if (adminError) {
-      console.error('Error fetching admin bank account:', adminError);
-      return c.json({ error: 'Error fetching admin bank account: ' + adminError.message }, 500);
+    if (error || !admin) {
+      console.error('Error fetching admin bank account:', error);
+      return c.json({ error: 'Data rekening tidak ditemukan' }, 404);
     }
     
-    if (!adminProfiles || adminProfiles.length === 0) {
-      console.error('No admin profiles found in database');
-      return c.json({ error: 'Belum ada Admin RT yang terdaftar. Silakan registrasi Admin RT terlebih dahulu.' }, 404);
-    }
-    
-    const adminProfile = adminProfiles[0];
-    
-    if (!adminProfile.bri_account_number || !adminProfile.bri_account_name) {
-      console.error('Admin bank account information incomplete');
-      return c.json({ error: 'Informasi rekening BRI Admin RT belum lengkap' }, 404);
-    }
-    
-    return c.json({ 
+    return c.json({
       bankAccount: {
-        accountNumber: adminProfile.bri_account_number,
-        accountName: adminProfile.bri_account_name,
-        rtName: adminProfile.name,
-        rt: adminProfile.rt,
-        rw: adminProfile.rw
+        accountNumber: admin.bri_account_number,
+        accountName: admin.bri_account_name,
+        adminName: admin.name
       }
     });
   } catch (error) {
-    console.error('Error in get admin bank account:', error);
-    return c.json({ error: 'Internal server error: ' + error.message }, 500);
+    console.error('Error in bank account endpoint:', error);
+    return c.json({ error: 'Gagal mengambil data rekening' }, 500);
   }
 });
 
-// Delete resident (Admin only)
-app.delete('/make-server-64eec44a/residents/:id', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const supabase = getSupabaseClient();
-    
-    // Verify admin access
-    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-    
-    // Check if user is admin
-    const { data: adminProfile, error: adminError } = await supabase
-      .from('admin_profiles')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-    
-    if (adminError || !adminProfile) {
-      return c.json({ error: 'Unauthorized - Admin access required' }, 403);
-    }
-    
-    const residentId = c.req.param('id');
-    
-    // Delete resident profile
-    const { error: deleteError } = await supabase
-      .from('resident_profiles')
-      .delete()
-      .eq('id', residentId);
-    
-    if (deleteError) {
-      console.error('Error deleting resident:', deleteError);
-      return c.json({ error: deleteError.message }, 400);
-    }
-    
-    // Delete auth user
-    const { error: authDeleteError } = await supabase.auth.admin.deleteUser(residentId);
-    
-    if (authDeleteError) {
-      console.error('Error deleting auth user:', authDeleteError);
-    }
-    
-    return c.json({ success: true });
-  } catch (error) {
-    console.error('Error in delete resident:', error);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
-
-// Get user profile
-app.get('/make-server-64eec44a/profile', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const supabase = getSupabaseClient();
-    
-    // Verify user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-    
-    // Check if admin
-    const { data: adminProfile } = await supabase
-      .from('admin_profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    
-    if (adminProfile) {
-      return c.json({ profile: adminProfile, role: 'admin' });
-    }
-    
-    // Check if resident
-    const { data: residentProfile } = await supabase
-      .from('resident_profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    
-    if (residentProfile) {
-      return c.json({ profile: residentProfile, role: 'resident' });
-    }
-    
-    return c.json({ error: 'Profile not found' }, 404);
-  } catch (error) {
-    console.error('Error in get profile:', error);
-    return c.json({ error: 'Internal server error' }, 500);
-  }
-});
+// Reports endpoints
+app.get('/make-server-64eec44a/reports', reports.getReports);
 
 Deno.serve(app.fetch);

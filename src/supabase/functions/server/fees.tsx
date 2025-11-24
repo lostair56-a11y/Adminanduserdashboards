@@ -100,41 +100,74 @@ export async function getFees(c: Context) {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     const supabase = getSupabaseClient();
     
-    // Verify user
     const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
     if (authError || !user) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-    
-    const residentId = c.req.param('residentId');
-    
-    // Check if user is admin
+
+    // Check if user is admin or resident
     const { data: adminProfile } = await supabase
       .from('admin_profiles')
-      .select('id')
+      .select('rt, rw')
       .eq('id', user.id)
-      .single();
-    
-    let query = supabase.from('fee_payments').select('id, resident_id, amount, month, year, status, payment_date, payment_method, created_at');
-    
-    if (adminProfile) {
-      // Admin can see all or specific resident
-      if (residentId) {
-        query = query.eq('resident_id', residentId);
+      .maybeSingle(); // Use maybeSingle to avoid error when not found
+
+    let residentIds: string[] = [];
+
+    if (adminProfile && adminProfile.rt && adminProfile.rw) {
+      // Admin: Get only residents from same RT/RW
+      const { data: residents, error: residentsError } = await supabase
+        .from('resident_profiles')
+        .select('id')
+        .eq('rt', adminProfile.rt)
+        .eq('rw', adminProfile.rw);
+
+      if (residentsError) {
+        console.error('Error fetching residents:', residentsError);
+        return c.json({ error: residentsError.message }, 400);
       }
+
+      residentIds = residents?.map(r => r.id) || [];
     } else {
-      // Resident can only see their own
-      query = query.eq('resident_id', user.id);
+      // Resident: Get their own fees
+      residentIds = [user.id];
     }
-    
-    const { data: fees, error: feesError } = await query.order('created_at', { ascending: false });
-    
-    if (feesError) {
-      console.error('Error fetching fees:', feesError);
-      return c.json({ error: feesError.message }, 400);
+
+    if (residentIds.length === 0) {
+      return c.json({ fees: [] });
     }
+
+    const residentId = c.req.param('residentId');
     
-    return c.json({ fees });
+    let query = supabase
+      .from('fee_payments')
+      .select('*')
+      .in('resident_id', residentIds)
+      .order('created_at', { ascending: false });
+
+    if (residentId && residentId !== 'undefined') {
+      query = query.eq('resident_id', residentId);
+    }
+
+    const { data: fees, error } = await query;
+
+    if (error) {
+      console.error('Error fetching fees:', error);
+      return c.json({ error: error.message }, 400);
+    }
+
+    // Fetch descriptions from KV store
+    const feesWithDescriptions = await Promise.all(
+      (fees || []).map(async (fee) => {
+        const description = await kv.get(`fee_description_${fee.id}`);
+        return {
+          ...fee,
+          description: description || fee.description
+        };
+      })
+    );
+
+    return c.json({ fees: feesWithDescriptions });
   } catch (error) {
     console.error('Error in get fees:', error);
     return c.json({ error: 'Internal server error' }, 500);
@@ -422,6 +455,158 @@ export async function verifyPayment(c: Context) {
     return c.json({ success: true, fee: updatedFee });
   } catch (error) {
     console.error('Error in verify payment:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+
+// Get waste bank statistics (Admin only)
+export async function getWasteBankStats(c: Context) {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
+    // Verify admin access
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Check if user is admin
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('admin_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+    
+    if (adminError || !adminProfile) {
+      return c.json({ error: 'Unauthorized - Admin access required' }, 403);
+    }
+    
+    // Get current month deposits
+    const currentMonth = new Date();
+    const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).toISOString();
+    
+    const { data: monthlyDeposits, error: depositsError } = await supabase
+      .from('waste_deposits')
+      .select('*')
+      .gte('date', startOfMonth)
+      .gt('total_value', 0); // Only positive values (actual deposits, not payments)
+    
+    if (depositsError) {
+      console.error('Error fetching deposits:', depositsError);
+      return c.json({ error: depositsError.message }, 400);
+    }
+    
+    const totalWeight = monthlyDeposits?.reduce((sum, d) => sum + (d.weight || 0), 0) || 0;
+    const totalValue = monthlyDeposits?.reduce((sum, d) => sum + (d.total_value || 0), 0) || 0;
+    const totalTransactions = monthlyDeposits?.length || 0;
+    
+    return c.json({
+      stats: {
+        totalTransactions,
+        totalWeight,
+        totalValue,
+        month: currentMonth.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+      }
+    });
+  } catch (error) {
+    console.error('Error in get waste bank stats:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+
+// Update fee
+export async function updateFee(c: Context) {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Check if user is admin
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('admin_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+    
+    if (adminError || !adminProfile) {
+      return c.json({ error: 'Unauthorized - Admin access required' }, 403);
+    }
+    
+    const feeId = c.req.param('id');
+    const body = await c.req.json();
+    const { amount, month, year, description } = body;
+    
+    if (!amount || !month || !year) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+    
+    const { data, error } = await supabase
+      .from('fee_payments')
+      .update({
+        amount,
+        month,
+        year,
+        description,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', feeId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating fee:', error);
+      return c.json({ error: error.message }, 400);
+    }
+    
+    return c.json({ success: true, fee: data });
+  } catch (error) {
+    console.error('Error in update fee:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+
+// Delete fee
+export async function deleteFee(c: Context) {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Check if user is admin
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('admin_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+    
+    if (adminError || !adminProfile) {
+      return c.json({ error: 'Unauthorized - Admin access required' }, 403);
+    }
+    
+    const feeId = c.req.param('id');
+    
+    const { error } = await supabase
+      .from('fee_payments')
+      .delete()
+      .eq('id', feeId);
+    
+    if (error) {
+      console.error('Error deleting fee:', error);
+      return c.json({ error: error.message }, 400);
+    }
+    
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error in delete fee:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 }

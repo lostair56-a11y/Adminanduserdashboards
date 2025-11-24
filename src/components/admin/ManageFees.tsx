@@ -1,4 +1,6 @@
 import { CreateBillDialog } from './CreateBillDialog';
+import { EditFeeDialog } from './EditFeeDialog';
+import { PendingPaymentsDialog } from './PendingPaymentsDialog';
 import { toast } from 'sonner@2.0.3';
 import { projectId } from '../../utils/supabase/info';
 import { supabase } from '../../lib/supabase';
@@ -8,7 +10,17 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Search, CheckCircle, XCircle, Bell, Plus } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Bell, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 interface FeeRecord {
   id: string;
@@ -34,6 +46,9 @@ export function ManageFees() {
   const [residents, setResidents] = useState<Resident[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateBill, setShowCreateBill] = useState(false);
+  const [showPendingPayments, setShowPendingPayments] = useState(false);
+  const [editingFee, setEditingFee] = useState<FeeRecord | null>(null);
+  const [deletingFee, setDeletingFee] = useState<FeeRecord | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -118,6 +133,43 @@ export function ManageFees() {
   const sendReminder = (residentId: string) => {
     const residentName = getResidentName(residentId);
     toast.success(`Pengingat pembayaran telah dikirim ke ${residentName}`);
+  };
+
+  const handleDeleteFee = async (feeId: string) => {
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        toast.error('Sesi tidak valid');
+        return;
+      }
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/delete-fee`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ fee_id: feeId })
+        }
+      );
+
+      if (response.ok) {
+        toast.success('Tagihan berhasil dihapus');
+        fetchData();
+      } else {
+        toast.error('Gagal menghapus tagihan');
+      }
+    } catch (error) {
+      console.error('Error deleting fee:', error);
+      toast.error('Gagal menghapus tagihan');
+    } finally {
+      setLoading(false);
+      setDeletingFee(null);
+    }
   };
 
   return (
@@ -254,6 +306,27 @@ export function ManageFees() {
                             Kirim Pengingat
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setDeletingFee(record);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Hapus
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingFee(record);
+                            setShowPendingPayments(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -269,6 +342,41 @@ export function ManageFees() {
         onOpenChange={setShowCreateBill}
         onSuccess={fetchData}
       />
+
+      <PendingPaymentsDialog
+        open={showPendingPayments}
+        onOpenChange={setShowPendingPayments}
+        onVerificationComplete={fetchData}
+      />
+
+      <EditFeeDialog
+        open={showPendingPayments}
+        onOpenChange={setShowPendingPayments}
+        onVerificationComplete={fetchData}
+      />
+
+      <AlertDialog open={deletingFee !== null} onOpenChange={setDeletingFee}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Tagihan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus tagihan ini? Tindakan ini tidak dapat diurungkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Tidak, batalkan</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deletingFee) {
+                  handleDeleteFee(deletingFee.id);
+                }
+              }}
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Ya, hapus'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
