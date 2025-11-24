@@ -42,12 +42,19 @@ export function FeePaymentDialog({ open, onOpenChange, amount, feeId, onPaymentS
   const fetchBankAccount = async () => {
     setLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        toast.error('Sesi tidak valid. Silakan login kembali.');
+        return;
+      }
+
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/admin/bank-account`,
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`
+            'Authorization': `Bearer ${session.access_token}`
           }
         }
       );
@@ -172,6 +179,9 @@ export function FeePaymentDialog({ open, onOpenChange, amount, feeId, onPaymentS
                 <div className="flex-1">
                   <p className="text-xs text-gray-600">Bank</p>
                   <p className="font-medium">Bank BRI</p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Admin RT {bankAccount?.rt} / RW {bankAccount?.rw}
+                  </p>
                 </div>
               </div>
 
@@ -204,6 +214,9 @@ export function FeePaymentDialog({ open, onOpenChange, amount, feeId, onPaymentS
                 <p className="text-xs text-gray-600 mb-1">Nama Penerima</p>
                 <div className="p-3 bg-white rounded border border-gray-200">
                   <p className="font-medium">{bankAccount?.accountName || 'Loading...'}</p>
+                  {bankAccount?.rtName && (
+                    <p className="text-xs text-gray-500 mt-1">{bankAccount.rtName}</p>
+                  )}
                 </div>
               </div>
             </div>

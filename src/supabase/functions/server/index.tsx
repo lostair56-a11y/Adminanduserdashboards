@@ -293,28 +293,57 @@ app.post('/make-server-64eec44a/schedules/create', schedule.createSchedule);
 app.put('/make-server-64eec44a/schedules/:id', schedule.updateSchedule);
 app.delete('/make-server-64eec44a/schedules/:id', schedule.deleteSchedule);
 
-// Admin bank account endpoint
+// Admin bank account endpoint - returns bank account for the same RT/RW as the user
 app.get('/make-server-64eec44a/admin/bank-account', async (c) => {
   try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized - Missing token' }, 401);
+    }
+    
     const supabase = getSupabaseClient();
     
-    // Get the first admin's bank account info
-    const { data: admin, error } = await supabase
+    // Get the authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) {
+      console.error('Auth error while fetching bank account:', authError);
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Get user's RT/RW from resident profile
+    const { data: residentProfile, error: profileError } = await supabase
+      .from('resident_profiles')
+      .select('rt, rw')
+      .eq('id', user.id)
+      .single();
+    
+    if (profileError || !residentProfile) {
+      console.error('Error fetching resident profile:', profileError);
+      return c.json({ error: 'Profil warga tidak ditemukan' }, 404);
+    }
+    
+    // Get admin's bank account for the same RT/RW
+    const { data: admin, error: adminError } = await supabase
       .from('admin_profiles')
-      .select('bri_account_number, bri_account_name, name')
+      .select('bri_account_number, bri_account_name, name, rt, rw')
+      .eq('rt', residentProfile.rt)
+      .eq('rw', residentProfile.rw)
       .limit(1)
       .single();
     
-    if (error || !admin) {
-      console.error('Error fetching admin bank account:', error);
-      return c.json({ error: 'Data rekening tidak ditemukan' }, 404);
+    if (adminError || !admin) {
+      console.error('Error fetching admin bank account:', adminError);
+      return c.json({ error: 'Data rekening Admin RT tidak ditemukan. Hubungi Admin RT Anda.' }, 404);
     }
     
     return c.json({
       bankAccount: {
         accountNumber: admin.bri_account_number,
         accountName: admin.bri_account_name,
-        adminName: admin.name
+        rtName: admin.name,
+        rt: admin.rt,
+        rw: admin.rw
       }
     });
   } catch (error) {

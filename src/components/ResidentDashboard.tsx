@@ -22,7 +22,8 @@ import {
   FileText, 
   ArrowRight, 
   Wallet,
-  AlertCircle 
+  AlertCircle,
+  Clock 
 } from 'lucide-react';
 import { FeePaymentDialog } from './resident/FeePaymentDialog';
 import { WasteBankPaymentDialog } from './resident/WasteBankPaymentDialog';
@@ -30,7 +31,7 @@ import { PaymentHistoryDialog } from './resident/PaymentHistoryDialog';
 import { WasteBankHistoryDialog } from './resident/WasteBankHistoryDialog';
 import { NotificationsDialog } from './resident/NotificationsDialog';
 
-type MenuItem = 'dashboard' | 'payment-history' | 'wastebank-history' | 'profile';
+type MenuItem = 'dashboard' | 'payment-history' | 'wastebank-history' | 'schedules' | 'profile';
 
 interface FeeRecord {
   id: string;
@@ -44,6 +45,16 @@ interface FeeRecord {
   description?: string;
 }
 
+interface Schedule {
+  id: string;
+  date: string;
+  area: string;
+  time: string;
+  status: 'scheduled' | 'completed';
+  rt: string;
+  rw: string;
+}
+
 export function ResidentDashboard() {
   const { signOut, profile, user } = useAuth();
   const residentProfile = profile as ResidentProfileType;
@@ -55,13 +66,16 @@ export function ResidentDashboard() {
   const [showWasteBankHistory, setShowWasteBankHistory] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [fees, setFees] = useState<FeeRecord[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [schedulesLoading, setSchedulesLoading] = useState(true);
   const [selectedFeeId, setSelectedFeeId] = useState<string | undefined>();
   const [selectedFeeAmount, setSelectedFeeAmount] = useState<number>(0);
 
   useEffect(() => {
     if (user?.id) {
       fetchFees();
+      fetchSchedules();
     }
   }, [user]);
 
@@ -107,6 +121,48 @@ export function ResidentDashboard() {
     }
   };
 
+  const fetchSchedules = async () => {
+    setSchedulesLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        console.log('No session or access token found for schedules');
+        return;
+      }
+
+      console.log('Fetching schedules for resident');
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/schedules/public`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Schedules response status:', response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Schedules data received:', data);
+        console.log('Number of schedules:', data.schedules?.length || 0);
+        setSchedules(data.schedules || []);
+      } else {
+        const errorData = await response.json();
+        console.error('Error response from server:', errorData);
+        toast.error('Gagal memuat jadwal: ' + (errorData.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error fetching schedules:', error);
+      toast.error('Gagal memuat jadwal');
+    } finally {
+      setSchedulesLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await signOut();
@@ -119,6 +175,9 @@ export function ResidentDashboard() {
   const unpaidFees = fees.filter(fee => fee.status === 'unpaid');
   const paidFees = fees.filter(fee => fee.status === 'paid');
 
+  // Get next scheduled pickup
+  const nextSchedule = schedules.length > 0 ? schedules[0] : null;
+
   // Data from profile
   const residentData = {
     name: residentProfile?.name || 'Warga',
@@ -127,13 +186,17 @@ export function ResidentDashboard() {
     feeAmount: 50000,
     wasteBankBalance: residentProfile?.waste_bank_balance || 0,
     notifications: unpaidFees.length,
-    nextCollection: 'Belum ada jadwal',
+    nextCollection: nextSchedule 
+      ? `${new Date(nextSchedule.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })} - ${nextSchedule.time}`
+      : 'Belum ada jadwal',
+    nextScheduleArea: nextSchedule?.area || '',
   };
 
   const menuItems = [
     { id: 'dashboard' as MenuItem, label: 'Beranda', icon: Home },
     { id: 'payment-history' as MenuItem, label: 'Riwayat Iuran', icon: History },
     { id: 'wastebank-history' as MenuItem, label: 'Riwayat Bank Sampah', icon: FileText },
+    { id: 'schedules' as MenuItem, label: 'Jadwal Pengangkutan', icon: Calendar },
   ];
 
   const renderContent = () => {
@@ -286,20 +349,32 @@ export function ResidentDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-white rounded-lg shadow-sm">
-                        <Calendar className="h-8 w-8 text-amber-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Jadwal Pengangkutan Berikutnya</p>
-                        <p className="text-xl text-gray-900">{residentData.nextCollection}</p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Harap siapkan sampah Anda sebelum pukul 07:00 WIB
-                        </p>
+                  {schedulesLoading ? (
+                    <div className="text-center py-6">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Memuat jadwal...</p>
+                    </div>
+                  ) : nextSchedule ? (
+                    <div className="p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-white rounded-lg shadow-sm">
+                          <Calendar className="h-8 w-8 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 mb-1">Jadwal Pengangkutan Berikutnya</p>
+                          <p className="text-xl text-gray-900">{residentData.nextCollection}</p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Harap siapkan sampah Anda sebelum pukul 07:00 WIB
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="text-center py-6 text-gray-500">
+                      <History className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                      <p>Belum ada jadwal pengangkutan</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -388,6 +463,79 @@ export function ResidentDashboard() {
                             <p>{new Date(fee.payment_date).toLocaleDateString('id-ID')}</p>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      case 'schedules':
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Jadwal Pengangkutan Sampah</CardTitle>
+              <CardDescription>Jadwal pengangkutan sampah untuk RT {residentProfile?.rt} / RW {residentProfile?.rw}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {schedulesLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Memuat jadwal...</p>
+                </div>
+              ) : schedules.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>Belum ada jadwal pengangkutan</p>
+                  <p className="text-sm mt-1">Admin RT belum menambahkan jadwal</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {schedules.map((schedule) => (
+                    <div
+                      key={schedule.id}
+                      className="p-5 border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-4">
+                          <div className="text-center min-w-[4rem] p-3 bg-white rounded-lg shadow-sm">
+                            <p className="text-2xl text-amber-600">
+                              {new Date(schedule.date).getDate()}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {new Date(schedule.date).toLocaleDateString('id-ID', { month: 'short' })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="font-medium text-lg">
+                              {new Date(schedule.date).toLocaleDateString('id-ID', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </p>
+                            <div className="flex items-center gap-4 mt-1">
+                              <div className="flex items-center gap-1 text-sm text-gray-600">
+                                <Clock className="h-4 w-4" />
+                                <span>{schedule.time}</span>
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Area: {schedule.area}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="bg-white">
+                          {schedule.status === 'scheduled' ? 'Terjadwal' : 'Selesai'}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-amber-200">
+                        <p className="text-sm text-gray-600 flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" />
+                          Harap siapkan sampah Anda sebelum waktu pengangkutan
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -533,6 +681,7 @@ export function ResidentDashboard() {
                     {activeMenu === 'dashboard' && 'Beranda'}
                     {activeMenu === 'payment-history' && 'Riwayat Iuran'}
                     {activeMenu === 'wastebank-history' && 'Riwayat Bank Sampah'}
+                    {activeMenu === 'schedules' && 'Jadwal Pengangkutan'}
                     {activeMenu === 'profile' && 'Profil Saya'}
                   </h1>
                 </div>
