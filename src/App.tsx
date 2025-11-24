@@ -84,7 +84,7 @@ function AppContent() {
               <Building2 className="w-10 h-10 text-white" />
             </div>
             <h1 className="mb-2 bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-              Sistem Manajemen RT
+              SikasRT
             </h1>
             <p className="text-gray-600 text-lg">
               Platform digital untuk kelola iuran dan bank sampah RT Anda

@@ -1,7 +1,7 @@
 {
-  "name": "sistem-manajemen-rt",
+  "name": "sikasrt",
   "version": "1.0.0",
-  "description": "Sistem Manajemen RT - Platform digital untuk kelola iuran dan bank sampah RT",
+  "description": "SikasRT - Sistem Informasi Kelola dan Administrasi RT Digital",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -29,12 +29,13 @@
     "tailwindcss": "^4.0.0"
   },
   "keywords": [
+    "sikasrt",
     "sistem-rt",
     "manajemen-rt",
     "iuran-rt",
     "bank-sampah",
     "digital-rt"
   ],
-  "author": "Sistem Manajemen RT",
+  "author": "SikasRT",
   "license": "MIT"
 }
