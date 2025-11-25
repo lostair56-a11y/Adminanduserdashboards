@@ -296,26 +296,48 @@ app.delete('/make-server-64eec44a/schedules/:id', schedule.deleteSchedule);
 // Admin bank account endpoint - returns bank account for the same RT/RW as the user
 app.get('/make-server-64eec44a/admin/bank-account', async (c) => {
   try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const authHeader = c.req.header('Authorization');
     
-    if (!accessToken) {
-      return c.json({ error: 'Unauthorized - Missing token' }, 401);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized - Missing or invalid token' }, 401);
+    }
+    
+    const accessToken = authHeader.split(' ')[1];
+    
+    // Decode JWT to get user ID
+    const parts = accessToken.split('.');
+    if (parts.length !== 3) {
+      return c.json({ error: 'Unauthorized - Invalid token format' }, 401);
+    }
+    
+    let payload;
+    try {
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      payload = JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error('Error decoding token:', e);
+      return c.json({ error: 'Unauthorized - Invalid token' }, 401);
+    }
+    
+    const userId = payload.sub;
+    if (!userId) {
+      return c.json({ error: 'Unauthorized - No user ID in token' }, 401);
     }
     
     const supabase = getSupabaseClient();
-    
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
-    if (authError || !user) {
-      console.error('Auth error while fetching bank account:', authError);
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
     
     // Get user's RT/RW from resident profile
     const { data: residentProfile, error: profileError } = await supabase
       .from('resident_profiles')
       .select('rt, rw')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
     
     if (profileError || !residentProfile) {

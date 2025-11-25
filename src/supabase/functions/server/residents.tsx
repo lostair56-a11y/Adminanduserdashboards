@@ -146,23 +146,50 @@ export async function deleteResident(c: Context) {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     const supabase = getSupabaseClient();
     
-    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
+    if (!accessToken) {
+      console.error('Delete resident error: No access token provided');
+      return c.json({ error: 'Unauthorized - No access token provided' }, 401);
     }
     
-    // Check if user is admin
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) {
+      console.error('Delete resident auth error:', authError);
+      return c.json({ error: 'Unauthorized - Invalid token' }, 401);
+    }
+    
+    // Get admin profile to verify RT/RW
     const { data: adminProfile, error: adminError } = await supabase
       .from('admin_profiles')
-      .select('id')
+      .select('rt, rw')
       .eq('id', user.id)
       .single();
     
     if (adminError || !adminProfile) {
+      console.error('Admin profile error during delete:', adminError);
       return c.json({ error: 'Unauthorized - Admin access required' }, 403);
     }
     
     const residentId = c.req.param('id');
+    
+    // Verify resident belongs to same RT/RW
+    const { data: residentProfile, error: residentError } = await supabase
+      .from('resident_profiles')
+      .select('rt, rw, name')
+      .eq('id', residentId)
+      .single();
+    
+    if (residentError || !residentProfile) {
+      console.error('Resident not found:', residentError);
+      return c.json({ error: 'Data warga tidak ditemukan' }, 404);
+    }
+    
+    // Check RT/RW match
+    if (residentProfile.rt !== adminProfile.rt || residentProfile.rw !== adminProfile.rw) {
+      console.error(`Admin RT/RW mismatch: Admin(${adminProfile.rt}/${adminProfile.rw}) tried to delete resident(${residentProfile.rt}/${residentProfile.rw})`);
+      return c.json({ 
+        error: 'Anda tidak memiliki izin untuk menghapus warga dari RT/RW lain' 
+      }, 403);
+    }
     
     // Delete related records first (fees, waste deposits, notifications)
     await supabase.from('fee_payments').delete().eq('resident_id', residentId);
@@ -188,6 +215,7 @@ export async function deleteResident(c: Context) {
       // Continue anyway since profile is deleted
     }
     
+    console.log(`Successfully deleted resident: ${residentProfile.name} (${residentId})`);
     return c.json({ success: true });
   } catch (error) {
     console.error('Error in delete resident:', error);

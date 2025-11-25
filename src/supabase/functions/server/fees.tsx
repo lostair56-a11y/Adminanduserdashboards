@@ -13,6 +13,30 @@ const getSupabaseClient = () => {
   return createClient(supabaseUrl, supabaseServiceRoleKey);
 };
 
+// Helper function to decode JWT and get user ID
+const getUserIdFromToken = (accessToken: string): string | null => {
+  try {
+    const parts = accessToken.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+    
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const payload = JSON.parse(jsonPayload);
+    return payload.sub || null;
+  } catch (e) {
+    console.error('Error decoding token:', e);
+    return null;
+  }
+};
+
 export async function createFee(c: Context) {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -177,13 +201,17 @@ export async function getFees(c: Context) {
 export async function payFee(c: Context) {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const supabase = getSupabaseClient();
     
-    // Verify user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
-    if (authError || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized - Missing token' }, 401);
     }
+    
+    const userId = getUserIdFromToken(accessToken);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized - Invalid token' }, 401);
+    }
+    
+    const supabase = getSupabaseClient();
     
     const body = await c.req.json();
     const { feeId, paymentMethod, paymentProof } = body;
@@ -197,7 +225,7 @@ export async function payFee(c: Context) {
       .from('fee_payments')
       .select('*')
       .eq('id', feeId)
-      .eq('resident_id', user.id)
+      .eq('resident_id', userId)
       .eq('status', 'unpaid')
       .single();
     
@@ -213,7 +241,7 @@ export async function payFee(c: Context) {
         const base64Data = paymentProof.split(',')[1];
         const buffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
         
-        const fileName = `${user.id}/${feeId}-${Date.now()}.jpg`;
+        const fileName = `${userId}/${feeId}-${Date.now()}.jpg`;
         const bucketName = 'make-64eec44a-payment-proofs';
         
         const { error: uploadError } = await supabase.storage
@@ -266,7 +294,7 @@ export async function payFee(c: Context) {
     const { data: residentProfile } = await supabase
       .from('resident_profiles')
       .select('name')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
     
     // Create notification for admin (get first admin)
@@ -291,7 +319,7 @@ export async function payFee(c: Context) {
     await supabase
       .from('notifications')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         title: 'Bukti Pembayaran Terkirim',
         message: `Bukti pembayaran iuran ${fee.month} ${fee.year} sebesar Rp ${fee.amount.toLocaleString('id-ID')} telah dikirim. Menunggu verifikasi Admin RT.`,
         type: 'success'
