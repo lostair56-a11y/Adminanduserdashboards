@@ -3,10 +3,17 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Calendar } from '../ui/calendar';
 import { Badge } from '../ui/badge';
+<<<<<<< HEAD
 import { Plus, Calendar as CalendarIcon, CheckCircle, Trash2 } from 'lucide-react';
 import { AddScheduleDialog } from './AddScheduleDialog';
 import { toast } from 'sonner@2.0.3';
 import { projectId } from '../../utils/supabase/info';
+=======
+import { Plus, Calendar as CalendarIcon, Pencil, Trash2, CheckCircle } from 'lucide-react';
+import { AddScheduleDialog } from './AddScheduleDialog';
+import { toast } from 'sonner@2.0.3';
+import { projectId, publicAnonKey } from '../../utils/supabase/info';
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Schedule {
@@ -34,7 +41,11 @@ export function ManageSchedule() {
 
   const fetchSchedules = async () => {
     if (!session?.access_token) return;
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
     setLoading(true);
     try {
       const response = await fetch(
@@ -65,6 +76,7 @@ export function ManageSchedule() {
     if (!session?.access_token) return;
 
     try {
+<<<<<<< HEAD
       const [jam_mulai, jam_selesai] = scheduleData.time.split(" - ");
       const adminId = session.user.id;
 
@@ -79,6 +91,8 @@ export function ManageSchedule() {
 
       console.log("Payload dikirim ke function:", payload);
 
+=======
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/schedules/create`,
         {
@@ -87,7 +101,11 @@ export function ManageSchedule() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
+<<<<<<< HEAD
           body: JSON.stringify(payload),
+=======
+          body: JSON.stringify(scheduleData),
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
         }
       );
 
@@ -98,7 +116,10 @@ export function ManageSchedule() {
       } else {
         const error = await response.json();
         toast.error(error.error || 'Gagal menambahkan jadwal');
+<<<<<<< HEAD
         console.error("Response error dari function:", error);
+=======
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
       }
     } catch (error) {
       console.error('Error adding schedule:', error);
@@ -167,6 +188,10 @@ export function ManageSchedule() {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
+<<<<<<< HEAD
+=======
+        {/* Calendar */}
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
         <Card>
           <CardHeader>
             <CardTitle>Kalender Pengangkutan</CardTitle>
@@ -182,6 +207,10 @@ export function ManageSchedule() {
           </CardContent>
         </Card>
 
+<<<<<<< HEAD
+=======
+        {/* Upcoming Schedules */}
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -252,6 +281,10 @@ export function ManageSchedule() {
         </Card>
       </div>
 
+<<<<<<< HEAD
+=======
+      {/* All Schedules List */}
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
       <Card>
         <CardHeader>
           <CardTitle>Semua Jadwal</CardTitle>
@@ -327,4 +360,8 @@ export function ManageSchedule() {
       />
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
