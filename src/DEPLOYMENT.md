@@ -9,6 +9,7 @@ Dokumen ini berisi langkah-langkah lengkap untuk deploy aplikasi SikasRT ke Verc
 - [ ] Email Provider sudah diaktifkan di Supabase
 - [ ] Credentials Supabase sudah benar di `/utils/supabase/info.tsx`
 - [ ] Build lokal berhasil (`npm run build`)
+- [ ] File `.gitignore` sudah dikonfigurasi dengan benar
 
 ## 📋 Langkah-langkah Deployment
 
@@ -17,7 +18,11 @@ Dokumen ini berisi langkah-langkah lengkap untuk deploy aplikasi SikasRT ke Verc
 Pastikan repository Git Anda sudah bersih dan siap deploy:
 
 ```bash
-# Commit semua perubahan
+# Test build lokal dulu
+npm install
+npm run build
+
+# Jika build berhasil, commit semua perubahan
 git add .
 git commit -m "Ready for production deployment"
 git push origin main
@@ -41,6 +46,8 @@ Vercel akan otomatis menggunakan settings berikut (dari `vercel.json`):
 - **Output Directory**: `dist`
 - **Install Command**: `npm install`
 
+**PENTING**: Pastikan settings ini TIDAK diubah. Biarkan menggunakan nilai default dari `vercel.json`.
+
 #### d. Deploy
 1. Click "Deploy"
 2. Tunggu proses build selesai (±2-3 menit)
@@ -55,7 +62,7 @@ npm install -g vercel
 # Login ke Vercel
 vercel login
 
-# Deploy
+# Deploy (preview)
 vercel
 
 # Deploy ke production
@@ -69,23 +76,25 @@ vercel --prod
 #### `vercel.json`
 ```json
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev",
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "installCommand": "npm install"
+  ]
 }
 ```
 
 File ini memastikan:
 - ✅ Client-side routing berfungsi (SPA)
 - ✅ Build command yang benar
-- ✅ Output directory yang sesuai
+- ✅ Output directory yang sesuai (dist)
+- ✅ Framework detection (Vite)
 
 #### `package.json`
 Build script sudah dikonfigurasi dengan benar:
@@ -95,6 +104,17 @@ Build script sudah dikonfigurasi dengan benar:
     "build": "tsc && vite build"
   }
 }
+```
+
+#### `vite.config.ts`
+Output directory sudah diset ke `dist`:
+```typescript
+export default defineConfig({
+  build: {
+    outDir: 'dist',
+    // ... other settings
+  }
+})
 ```
 
 ## 🔧 Post-Deployment
@@ -164,7 +184,39 @@ Jika Anda menggunakan environment variables tambahan:
 
 ## 🐛 Troubleshooting
 
-### Build Failed
+### Build Failed - "No Output Directory named 'dist' found"
+
+**Problem**: Vercel tidak menemukan folder `dist` setelah build
+
+**Solutions**:
+
+1. **Check Build Command**
+   - Pastikan Build Command di Vercel settings: `npm run build`
+   - JANGAN gunakan `vite build` saja (harus ada TypeScript compile dulu)
+
+2. **Check Output Directory**
+   - Pastikan Output Directory di Vercel settings: `dist`
+   - JANGAN dikosongkan atau diubah ke folder lain
+
+3. **Check vercel.json**
+   - Pastikan file `vercel.json` ada di root project
+   - Pastikan isi file sesuai dengan format di atas
+   - Jangan ubah `outputDirectory: "dist"`
+
+4. **Test Build Locally**
+   ```bash
+   npm install
+   npm run build
+   # Check apakah folder 'dist' terbuat
+   ls -la dist/
+   ```
+
+5. **Clear Vercel Cache**
+   - Buka Vercel Dashboard > Settings > General
+   - Scroll ke bawah, click "Clear Cache"
+   - Deploy ulang
+
+### Build Failed (Dependencies)
 
 **Error**: Dependencies installation failed
 ```bash
@@ -172,6 +224,8 @@ Jika Anda menggunakan environment variables tambahan:
 npm install
 npm run build  # Test locally first
 ```
+
+### Build Failed (TypeScript)
 
 **Error**: TypeScript compilation error
 ```bash

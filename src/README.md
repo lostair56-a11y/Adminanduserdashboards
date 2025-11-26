@@ -88,21 +88,46 @@ Output akan berada di folder `dist/`
 
 ## 🌐 Deploy ke Vercel
 
+### Quick Start (Recommended)
+```bash
+# 1. Test build lokal dulu
+npm run build
+
+# 2. Push ke Git
+git push origin main
+
+# 3. Deploy ke Vercel
+# Via Dashboard: Import repository, settings otomatis dari vercel.json
+# Via CLI: vercel --prod
+```
+
+📚 **Dokumentasi Lengkap**: Lihat `/VERCEL-QUICK-START.md` atau `/DEPLOYMENT.md`
+
 ### Via Vercel CLI
 ```bash
 npm install -g vercel
-vercel
+vercel login
+vercel --prod
 ```
 
 ### Via Vercel Dashboard
-1. Import repository ke Vercel
-2. Vercel akan otomatis mendeteksi settings dari `vercel.json`
-3. Deploy!
+1. Login ke https://vercel.com
+2. Import repository ke Vercel
+3. Vercel akan otomatis mendeteksi settings dari `vercel.json`
+4. **JANGAN ubah Build/Output settings** (sudah dikonfigurasi otomatis)
+5. Click Deploy!
+6. Tunggu ~2-3 menit
 
-**PENTING**: Pastikan Email Provider sudah diaktifkan di Supabase:
-1. Buka Supabase Dashboard > Authentication > Providers
-2. Aktifkan Email provider
-3. (Opsional) Setup SMTP untuk production
+**PENTING**: 
+- Pastikan Email Provider sudah diaktifkan di Supabase
+- Build lokal harus berhasil sebelum deploy (`npm run build`)
+- File `vercel.json` sudah dikonfigurasi dengan benar
+
+### Troubleshooting Deployment
+Jika error "No Output Directory 'dist' found":
+1. Test build lokal: `npm run build`
+2. Check folder `dist/` terbuat
+3. Baca: `/VERCEL-DEPLOYMENT-FIX.md`
 
 ## 🔐 Autentikasi
 
