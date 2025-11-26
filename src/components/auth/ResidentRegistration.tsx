@@ -145,28 +145,38 @@ export function ResidentRegistration({ onSuccess, onBack }: ResidentRegistration
                     )}
                   </div>
 
-                  <div>
-                    <Label htmlFor="rt">RT *</Label>
-                    <Input
-                      id="rt"
-                      value={formData.rt}
-                      onChange={(e) => setFormData({ ...formData, rt: e.target.value })}
-                      placeholder="003"
-                      className="mt-1"
-                    />
-                    {errors.rt && <p className="text-xs text-red-600 mt-1">{errors.rt}</p>}
-                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="rt">RT *</Label>
+                      <div className="relative mt-1">
+                        <Home className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="rt"
+                          value={formData.rt}
+                          onChange={(e) => setFormData({ ...formData, rt: e.target.value })}
+                          className="pl-10"
+                          placeholder="Contoh: 003"
+                        />
+                      </div>
+                      {errors.rt && <p className="text-xs text-red-600 mt-1">{errors.rt}</p>}
+                      <p className="text-xs text-gray-500 mt-1">Masukkan nomor RT Anda (tanya Admin RT)</p>
+                    </div>
 
-                  <div>
-                    <Label htmlFor="rw">RW *</Label>
-                    <Input
-                      id="rw"
-                      value={formData.rw}
-                      onChange={(e) => setFormData({ ...formData, rw: e.target.value })}
-                      placeholder="005"
-                      className="mt-1"
-                    />
-                    {errors.rw && <p className="text-xs text-red-600 mt-1">{errors.rw}</p>}
+                    <div>
+                      <Label htmlFor="rw">RW *</Label>
+                      <div className="relative mt-1">
+                        <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="rw"
+                          value={formData.rw}
+                          onChange={(e) => setFormData({ ...formData, rw: e.target.value })}
+                          className="pl-10"
+                          placeholder="Contoh: 005"
+                        />
+                      </div>
+                      {errors.rw && <p className="text-xs text-red-600 mt-1">{errors.rw}</p>}
+                      <p className="text-xs text-gray-500 mt-1">Masukkan nomor RW Anda (tanya Admin RT)</p>
+                    </div>
                   </div>
                 </div>
               </div>

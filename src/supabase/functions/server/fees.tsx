@@ -343,10 +343,10 @@ export async function getPendingPayments(c: Context) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     
-    // Check if user is admin
+    // Check if user is admin and get RT/RW
     const { data: adminProfile, error: adminError } = await supabase
       .from('admin_profiles')
-      .select('id')
+      .select('id, rt, rw')
       .eq('id', user.id)
       .single();
     
@@ -354,7 +354,25 @@ export async function getPendingPayments(c: Context) {
       return c.json({ error: 'Unauthorized - Admin access required' }, 403);
     }
     
-    // Get all pending fee payments (unpaid with payment_date filled) with resident info
+    // Get all residents in this RT/RW
+    const { data: residents, error: residentsError } = await supabase
+      .from('resident_profiles')
+      .select('id')
+      .eq('rt', adminProfile.rt)
+      .eq('rw', adminProfile.rw);
+    
+    if (residentsError) {
+      console.error('Error fetching residents:', residentsError);
+      return c.json({ error: residentsError.message }, 400);
+    }
+    
+    const residentIds = residents?.map(r => r.id) || [];
+    
+    if (residentIds.length === 0) {
+      return c.json({ fees: [] });
+    }
+    
+    // Get all pending fee payments (unpaid with payment_date filled) for residents in this RT/RW
     const { data: fees, error: feesError } = await supabase
       .from('fee_payments')
       .select(`
@@ -362,9 +380,12 @@ export async function getPendingPayments(c: Context) {
         resident:resident_profiles!resident_id (
           name,
           house_number,
-          phone
+          phone,
+          rt,
+          rw
         )
       `)
+      .in('resident_id', residentIds)
       .eq('status', 'unpaid')
       .not('payment_date', 'is', null)
       .order('payment_date', { ascending: false });

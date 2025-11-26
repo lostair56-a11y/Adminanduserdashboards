@@ -128,6 +128,108 @@ const initializeDemoAdmin = async () => {
 initializeStorage();
 initializeDemoAdmin();
 
+// Login endpoint - handles both admin and resident login
+app.post('/make-server-64eec44a/login', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { email, password, role } = body;
+    
+    if (!email || !password || !role) {
+      return c.json({ error: 'Email, password, dan role wajib diisi' }, 400);
+    }
+    
+    const supabase = getSupabaseClient();
+    
+    // Sign in with email and password using admin API
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (signInError) {
+      console.error('Sign in error:', signInError);
+      
+      // Special handling for email provider disabled error
+      if (signInError.message.includes('Email logins are disabled') || 
+          signInError.message.includes('email_provider_disabled')) {
+        return c.json({ 
+          error: '⚠️ CRITICAL: Email Provider belum di-enable di Supabase dashboard!\n\n' +
+                 'SOLUSI WAJIB (5 menit):\n' +
+                 '1. Login ke https://supabase.com/dashboard\n' +
+                 '2. Pilih project Anda\n' +
+                 '3. Buka: Authentication → Providers → Email\n' +
+                 '4. Toggle ON "Enable Email provider"\n' +
+                 '5. Check "Enable email signup"\n' +
+                 '6. Check "Enable email login"\n' +
+                 '7. Uncheck "Confirm email"\n' +
+                 '8. Klik "Save"\n\n' +
+                 'Baca file: CRITICAL-ENABLE-EMAIL-PROVIDER.md untuk panduan detail.\n\n' +
+                 'Aplikasi TIDAK AKAN BERFUNGSI sampai Email Provider di-enable!',
+          code: 'EMAIL_PROVIDER_DISABLED',
+          action_required: 'ENABLE_EMAIL_PROVIDER_IN_DASHBOARD'
+        }, 422);
+      }
+      
+      // Provide user-friendly error messages
+      if (signInError.message.includes('Invalid login credentials')) {
+        return c.json({ error: 'Email atau password salah' }, 401);
+      }
+      
+      return c.json({ error: signInError.message }, 401);
+    }
+    
+    if (!signInData.user || !signInData.session) {
+      return c.json({ error: 'Login gagal' }, 401);
+    }
+    
+    // Verify role by checking profile tables
+    const userId = signInData.user.id;
+    
+    if (role === 'admin') {
+      const { data: adminProfile, error: adminError } = await supabase
+        .from('admin_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (adminError || !adminProfile) {
+        return c.json({ error: 'Akun ini bukan akun Admin RT' }, 403);
+      }
+      
+      return c.json({
+        success: true,
+        user: signInData.user,
+        session: signInData.session,
+        profile: adminProfile,
+        role: 'admin'
+      });
+    } else if (role === 'resident') {
+      const { data: residentProfile, error: residentError } = await supabase
+        .from('resident_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (residentError || !residentProfile) {
+        return c.json({ error: 'Akun ini bukan akun Warga' }, 403);
+      }
+      
+      return c.json({
+        success: true,
+        user: signInData.user,
+        session: signInData.session,
+        profile: residentProfile,
+        role: 'resident'
+      });
+    } else {
+      return c.json({ error: 'Role tidak valid' }, 400);
+    }
+  } catch (error) {
+    console.error('Error in login:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // Admin registration endpoint
 app.post('/make-server-64eec44a/signup/admin', async (c) => {
   try {

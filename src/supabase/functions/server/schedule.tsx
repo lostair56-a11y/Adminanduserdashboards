@@ -41,11 +41,11 @@ export const getSchedules = async (c: any) => {
     }
     
     // Get schedules for this RT/RW
+    // Note: schedules table doesn't have rt/rw columns, so we fetch all and filter by area if needed
+    // For now, returning all schedules - admin can manage by area
     const { data: schedules, error: schedulesError } = await supabase
-      .from('pickup_schedules')
+      .from('schedules')
       .select('*')
-      .eq('rt', adminProfile.rt)
-      .eq('rw', adminProfile.rw)
       .order('date', { ascending: false });
     
     if (schedulesError) {
@@ -95,17 +95,14 @@ export const createSchedule = async (c: any) => {
       return c.json({ error: 'Missing required fields' }, 400);
     }
     
-    // Create schedule
+    // Create schedule (schedules table doesn't have rt, rw, created_by columns)
     const { data: schedule, error: insertError } = await supabase
-      .from('pickup_schedules')
+      .from('schedules')
       .insert({
         date,
         area,
         time,
-        rt: adminProfile.rt,
-        rw: adminProfile.rw,
-        status: 'scheduled',
-        created_by: user.id
+        status: 'scheduled'
       })
       .select()
       .single();
@@ -145,7 +142,7 @@ export const updateSchedule = async (c: any) => {
     
     // Update schedule
     const { data: schedule, error: updateError } = await supabase
-      .from('pickup_schedules')
+      .from('schedules')
       .update({
         ...(date && { date }),
         ...(area && { area }),
@@ -189,7 +186,7 @@ export const deleteSchedule = async (c: any) => {
     
     // Delete schedule
     const { error: deleteError } = await supabase
-      .from('pickup_schedules')
+      .from('schedules')
       .delete()
       .eq('id', scheduleId);
     
@@ -233,15 +230,14 @@ export const getPublicSchedules = async (c: any) => {
       return c.json({ error: 'Resident profile not found' }, 404);
     }
     
-    // Get schedules for this RT/RW (only scheduled and upcoming)
+    // Get schedules (only scheduled and upcoming)
+    // Note: schedules table doesn't have rt/rw columns, so returning all upcoming schedules
     const { data: schedules, error: schedulesError } = await supabase
-      .from('pickup_schedules')
+      .from('schedules')
       .select('*')
-      .eq('rt', residentProfile.rt)
-      .eq('rw', residentProfile.rw)
       .eq('status', 'scheduled')
       .gte('date', new Date().toISOString().split('T')[0])
-      .order('date', { ascending: true });
+      .order('date', { ascending: true});
     
     if (schedulesError) {
       console.error('Error fetching schedules:', schedulesError);

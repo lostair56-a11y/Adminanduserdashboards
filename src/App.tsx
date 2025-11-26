@@ -9,7 +9,6 @@ import { Button } from './components/ui/button';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Building2, Users, Leaf, TrendingUp } from 'lucide-react';
 import { Toaster } from './components/ui/sonner';
-import { DebugAuthInfo } from './components/DebugAuthInfo';
 
 function AppContent() {
   const { user, userRole, loading } = useAuth();
@@ -189,7 +188,6 @@ export default function App() {
     <AuthProvider>
       <AppContent />
       <Toaster />
-      <DebugAuthInfo />
     </AuthProvider>
   );
 }

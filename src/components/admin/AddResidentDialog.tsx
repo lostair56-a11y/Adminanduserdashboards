@@ -5,6 +5,8 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { projectId, publicAnonKey } from '../../utils/supabase/info';
 import { toast } from 'sonner';
+import { useAuth } from '../../contexts/AuthContext';
+import { AdminProfile } from '../../lib/supabase';
 
 interface AddResidentDialogProps {
   open: boolean;
@@ -13,19 +15,22 @@ interface AddResidentDialogProps {
 }
 
 export function AddResidentDialog({ open, onOpenChange, onSuccess }: AddResidentDialogProps) {
+  const { profile } = useAuth();
+  const adminProfile = profile as AdminProfile;
+  
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     name: '',
     houseNumber: '',
-    rt: '',
-    rw: '',
+    rt: adminProfile?.rt || '',  // Auto-fill dari admin
+    rw: adminProfile?.rw || '',  // Auto-fill dari admin
     phone: '',
     address: '',
-    kelurahan: '',
-    kecamatan: '',
-    kota: '',
+    kelurahan: adminProfile?.kelurahan || '',  // Auto-fill dari admin
+    kecamatan: adminProfile?.kecamatan || '',  // Auto-fill dari admin
+    kota: adminProfile?.kota || '',            // Auto-fill dari admin
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -47,13 +52,8 @@ export function AddResidentDialog({ open, onOpenChange, onSuccess }: AddResident
 
     if (!formData.name) newErrors.name = 'Nama wajib diisi';
     if (!formData.houseNumber) newErrors.houseNumber = 'Nomor rumah wajib diisi';
-    if (!formData.rt) newErrors.rt = 'RT wajib diisi';
-    if (!formData.rw) newErrors.rw = 'RW wajib diisi';
     if (!formData.phone) newErrors.phone = 'Nomor telepon wajib diisi';
     if (!formData.address) newErrors.address = 'Alamat wajib diisi';
-    if (!formData.kelurahan) newErrors.kelurahan = 'Kelurahan wajib diisi';
-    if (!formData.kecamatan) newErrors.kecamatan = 'Kecamatan wajib diisi';
-    if (!formData.kota) newErrors.kota = 'Kota wajib diisi';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -109,13 +109,13 @@ export function AddResidentDialog({ open, onOpenChange, onSuccess }: AddResident
         password: '',
         name: '',
         houseNumber: '',
-        rt: '',
-        rw: '',
+        rt: adminProfile?.rt || '',
+        rw: adminProfile?.rw || '',
         phone: '',
         address: '',
-        kelurahan: '',
-        kecamatan: '',
-        kota: '',
+        kelurahan: adminProfile?.kelurahan || '',
+        kecamatan: adminProfile?.kecamatan || '',
+        kota: adminProfile?.kota || '',
       });
     } catch (error: any) {
       console.error('Error adding resident:', error);

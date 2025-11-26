@@ -5,10 +5,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Input } from '../ui/input';
 import { AddResidentDialog } from './AddResidentDialog';
 import { EditResidentDialog } from './EditResidentDialog';
+import { ResidentDebugInfo } from './ResidentDebugInfo';
+import { SessionDebugger } from './SessionDebugger';
 import { supabase } from '../../lib/supabase';
 import { projectId } from '../../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
-import { Search, UserPlus, Edit, Trash2, Loader2, Home, Phone, Mail, Wallet, AlertTriangle } from 'lucide-react';
+import { Search, UserPlus, Edit, Trash2, Loader2, Home, Phone, Mail, Wallet, AlertTriangle, Bug } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,12 +53,15 @@ export function ManageResidents() {
 
   const loadResidents = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (!session?.access_token) {
+      if (sessionError || !session?.access_token) {
+        console.error('Session error:', sessionError);
         toast.error('Sesi tidak valid. Silakan login kembali.');
         return;
       }
+
+      console.log('Fetching residents with token:', session.access_token.substring(0, 20) + '...');
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/residents`,
@@ -68,12 +73,25 @@ export function ManageResidents() {
         }
       );
 
+      console.log('Residents response status:', response.status);
+
+      if (response.status === 401) {
+        // Unauthorized - token expired or invalid
+        console.error('Unauthorized: Token invalid or expired');
+        toast.error('Sesi kedaluwarsa. Silakan login kembali.');
+        // Clear session and redirect
+        await supabase.auth.signOut();
+        return;
+      }
+
       if (!response.ok) {
         const error = await response.json();
+        console.error('Fetch residents error:', error);
         throw new Error(error.error || 'Gagal mengambil data warga');
       }
 
       const data = await response.json();
+      console.log('Residents data:', data);
       setResidents(data.residents || []);
     } catch (error: any) {
       console.error('Error fetching residents:', error);
@@ -137,6 +155,14 @@ export function ManageResidents() {
 
   return (
     <div className="space-y-6">
+      {/* Session Debugger - Always show for troubleshooting */}
+      <SessionDebugger />
+      
+      {/* Debug Info - Hanya tampil jika tidak ada warga */}
+      {residents.length === 0 && !loading && (
+        <ResidentDebugInfo />
+      )}
+      
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

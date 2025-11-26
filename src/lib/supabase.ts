@@ -8,7 +8,7 @@ const supabaseAnonKey = publicAnonKey;
 class SupabaseClient {
   private url: string;
   private key: string;
-  private session: { access_token: string; user: any } | null = null;
+  private session: { access_token: string; refresh_token: string; user: any } | null = null;
 
   constructor(url: string, key: string) {
     this.url = url;
@@ -38,8 +38,88 @@ class SupabaseClient {
 
   auth = {
     getSession: async () => {
-      console.log('Getting session:', this.session);
+      // Check if session is expired
+      if (this.session?.expires_at && this.session.expires_at < Date.now()) {
+        // Try to refresh the session
+        const refreshed = await this.auth.refreshSession();
+        if (refreshed.data.session) {
+          return { data: { session: refreshed.data.session }, error: null };
+        } else {
+          // Clear expired session
+          this.saveSession(null);
+          return { data: { session: null }, error: null };
+        }
+      }
+      
       return { data: { session: this.session }, error: null };
+    },
+
+    refreshSession: async () => {
+      try {
+        if (!this.session?.refresh_token) {
+          return { data: { session: null }, error: { message: 'No refresh token' } };
+        }
+
+        const response = await fetch(`${this.url}/auth/v1/token?grant_type=refresh_token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': this.key,
+          },
+          body: JSON.stringify({ 
+            refresh_token: this.session.refresh_token 
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          this.saveSession(null);
+          return { data: { session: null }, error };
+        }
+
+        const data = await response.json();
+        const session = {
+          ...data,
+          expires_at: Date.now() + 3600000, // 1 hour
+        };
+        
+        this.saveSession(session);
+        return { data: { session }, error: null };
+      } catch (error) {
+        this.saveSession(null);
+        return { data: { session: null }, error };
+      }
+    },
+
+    setSession: async ({ access_token, refresh_token }: { access_token: string; refresh_token: string }) => {
+      try {
+        // Verify the token and get user info
+        const response = await fetch(`${this.url}/auth/v1/user`, {
+          method: 'GET',
+          headers: {
+            'apikey': this.key,
+            'Authorization': `Bearer ${access_token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          return { data: { session: null }, error };
+        }
+
+        const user = await response.json();
+        const session = {
+          access_token,
+          refresh_token,
+          user,
+          expires_at: Date.now() + 3600000, // 1 hour
+        };
+        
+        this.saveSession(session);
+        return { data: { session }, error: null };
+      } catch (error) {
+        return { data: { session: null }, error };
+      }
     },
 
     getUser: async (token?: string) => {
@@ -72,9 +152,6 @@ class SupabaseClient {
     
     signInWithPassword: async ({ email, password }: { email: string; password: string }) => {
       try {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Attempting sign in for:', email);
-        }
         const response = await fetch(`${this.url}/auth/v1/token?grant_type=password`, {
           method: 'POST',
           headers: {
@@ -85,23 +162,14 @@ class SupabaseClient {
         });
 
         const data = await response.json();
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Sign in response:', { status: response.status, ok: response.ok, data });
-        }
 
         if (!response.ok) {
-          console.error('Sign in failed:', data);
           return { data: { user: null, session: null }, error: data };
         }
 
         this.saveSession(data);
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Session saved, user:', data.user);
-        }
         return { data: { user: data.user, session: data }, error: null };
       } catch (error) {
-        console.error('Sign in error:', error);
         return { data: { user: null, session: null }, error };
       }
     },

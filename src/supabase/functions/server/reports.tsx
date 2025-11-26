@@ -58,36 +58,47 @@ export const getReports = async (c: any) => {
     }
     
     const totalResidents = residents?.length || 0;
+    const residentIds = residents?.map(r => r.id) || [];
     
-    // Get fees data for the selected month
-    const { data: fees, error: feesError } = await supabase
-      .from('fees')
+    if (residentIds.length === 0) {
+      // No residents, return empty data
+      return c.json({
+        fees: { total: 0, paid: 0, pending: 0, totalAmount: 0, paidAmount: 0 },
+        wasteBank: { totalDeposits: 0, totalWeight: 0, totalValue: 0, byType: [] },
+        participation: { totalResidents: 0, feePayersCount: 0, wasteBankParticipantsCount: 0 },
+        financial: { totalIncome: 0, feeIncome: 0, wasteBankIncome: 0 },
+        yearlyData: [],
+      });
+    }
+    
+    // Get fee_payments data for the selected month and residents
+    const monthName = getMonthName(parseInt(month));
+    const { data: feePayments, error: feesError } = await supabase
+      .from('fee_payments')
       .select('*')
-      .eq('rt', adminProfile.rt)
-      .eq('rw', adminProfile.rw)
-      .gte('due_date', startDate)
-      .lte('due_date', endDate);
+      .in('resident_id', residentIds)
+      .eq('month', monthName)
+      .eq('year', parseInt(year));
     
     if (feesError) {
       console.error('Error fetching fees:', feesError);
       return c.json({ error: feesError.message }, 500);
     }
     
-    const totalFees = fees?.length || 0;
-    const paidFees = fees?.filter(f => f.status === 'paid') || [];
-    const pendingFees = fees?.filter(f => f.status === 'pending') || [];
-    const totalAmount = fees?.reduce((sum, f) => sum + (f.amount || 0), 0) || 0;
+    const totalFees = feePayments?.length || 0;
+    const paidFees = feePayments?.filter(f => f.status === 'paid') || [];
+    const pendingFees = feePayments?.filter(f => f.status === 'pending') || [];
+    const totalAmount = feePayments?.reduce((sum, f) => sum + (f.amount || 0), 0) || 0;
     const paidAmount = paidFees.reduce((sum, f) => sum + (f.amount || 0), 0) || 0;
     
     // Get unique residents who paid fees
     const feePayersSet = new Set(paidFees.map(f => f.resident_id));
     
-    // Get waste bank deposits for the selected month
+    // Get waste bank deposits for the selected month (from residents in this RT/RW)
     const { data: deposits, error: depositsError } = await supabase
       .from('waste_deposits')
       .select('*')
-      .eq('rt', adminProfile.rt)
-      .eq('rw', adminProfile.rw)
+      .in('resident_id', residentIds)
       .gte('date', startDate)
       .lte('date', endDate);
     
@@ -98,7 +109,7 @@ export const getReports = async (c: any) => {
     
     const totalDeposits = deposits?.length || 0;
     const totalWeight = deposits?.reduce((sum, d) => sum + (d.weight || 0), 0) || 0;
-    const totalValue = deposits?.reduce((sum, d) => sum + (d.value || 0), 0) || 0;
+    const totalValue = deposits?.reduce((sum, d) => sum + (d.total_value || 0), 0) || 0;
     
     // Group by waste type
     const byTypeMap = new Map();
@@ -108,7 +119,7 @@ export const getReports = async (c: any) => {
       }
       const item = byTypeMap.get(d.waste_type);
       item.weight += d.weight || 0;
-      item.value += d.value || 0;
+      item.value += d.total_value || 0;
     });
     const byType = Array.from(byTypeMap.values());
     
@@ -117,38 +128,37 @@ export const getReports = async (c: any) => {
     
     // Get yearly data (all months in the selected year)
     const yearlyData = [];
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const shortMonthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
     
     for (let m = 1; m <= 12; m++) {
       const monthStr = m.toString().padStart(2, '0');
       const monthStartDate = `${year}-${monthStr}-01`;
       const monthEndDate = new Date(parseInt(year), m, 0).toISOString().split('T')[0];
       
-      // Get fees for this month
+      // Get fees for this month from residents in this RT/RW
+      const currentMonthName = getMonthName(m);
       const { data: monthFees } = await supabase
-        .from('fees')
-        .select('amount')
-        .eq('rt', adminProfile.rt)
-        .eq('rw', adminProfile.rw)
+        .from('fee_payments')
+        .select('amount, payment_date')
+        .in('resident_id', residentIds)
         .eq('status', 'paid')
-        .gte('payment_date', monthStartDate)
-        .lte('payment_date', monthEndDate);
+        .eq('month', currentMonthName)
+        .eq('year', parseInt(year));
       
       const monthFeesAmount = monthFees?.reduce((sum, f) => sum + (f.amount || 0), 0) || 0;
       
       // Get waste bank deposits for this month
       const { data: monthDeposits } = await supabase
         .from('waste_deposits')
-        .select('value')
-        .eq('rt', adminProfile.rt)
-        .eq('rw', adminProfile.rw)
+        .select('total_value')
+        .in('resident_id', residentIds)
         .gte('date', monthStartDate)
         .lte('date', monthEndDate);
       
-      const monthWasteBankValue = monthDeposits?.reduce((sum, d) => sum + (d.value || 0), 0) || 0;
+      const monthWasteBankValue = monthDeposits?.reduce((sum, d) => sum + (d.total_value || 0), 0) || 0;
       
       yearlyData.push({
-        month: monthNames[m - 1],
+        month: shortMonthNames[m - 1],
         fees: monthFeesAmount,
         wasteBank: monthWasteBankValue,
       });
@@ -184,4 +194,9 @@ export const getReports = async (c: any) => {
     console.error('Error in getReports:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
+};
+
+const getMonthName = (month: number) => {
+  const monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  return monthNames[month - 1];
 };

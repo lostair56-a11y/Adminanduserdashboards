@@ -129,28 +129,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string, role: 'admin' | 'resident') => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) throw error;
-
-    if (data.user && data.session) {
-      setSession(data.session);
-      const actualRole = await loadUserProfile(data.user.id);
+    try {
+      console.log('🔐 Attempting login...', { email, role });
       
-      // Verify role matches
-      if (role === 'admin' && actualRole !== 'admin') {
-        await supabase.auth.signOut();
-        setSession(null);
-        throw new Error('Akun ini bukan akun Admin RT');
+      // Call backend login endpoint
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/login`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${publicAnonKey}`,
+          },
+          body: JSON.stringify({ email, password, role }),
+        }
+      );
+
+      const data = await response.json();
+      console.log('📡 Login response:', { status: response.ok, data });
+
+      if (!response.ok) {
+        // Check for specific error types
+        if (data.error?.includes('email_provider_disabled') || 
+            data.error?.includes('Email logins are disabled')) {
+          throw new Error(
+            '❌ Email Provider belum di-enable di Supabase!\n\n' +
+            'LANGKAH FIX (5 menit):\n' +
+            '1. Buka Supabase Dashboard\n' +
+            '2. Authentication → Providers → Email\n' +
+            '3. Toggle ON "Enable Email provider"\n' +
+            '4. Klik "Save"\n\n' +
+            'Lihat file: CRITICAL-ENABLE-EMAIL-PROVIDER.md'
+          );
+        }
+        
+        if (data.error?.includes('Invalid login credentials')) {
+          throw new Error('Email atau password salah. Pastikan Anda sudah registrasi terlebih dahulu.');
+        }
+
+        throw new Error(data.error || 'Login gagal');
       }
-      if (role === 'resident' && actualRole !== 'resident') {
-        await supabase.auth.signOut();
-        setSession(null);
-        throw new Error('Akun ini bukan akun Warga');
+
+      // Set session manually using the session from backend
+      if (data.session && data.user) {
+        console.log('✅ Login successful, setting session...');
+        
+        // Use Supabase client to set the session
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+
+        if (sessionError) {
+          console.error('❌ Error setting session:', sessionError);
+          throw new Error('Gagal membuat sesi login');
+        }
+
+        setSession(data.session);
+        setUser(data.user);
+        setProfile(data.profile);
+        setUserRole(data.role);
+        
+        console.log('✅ Session set successfully');
+      } else {
+        throw new Error('Data sesi tidak lengkap');
       }
+    } catch (error: any) {
+      console.error('❌ Sign in failed:', error);
+      throw error;
     }
   };
 
@@ -211,20 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(data.error || 'Pendaftaran gagal');
       }
 
-      // Now sign in the user
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        throw new Error('Pendaftaran berhasil, tapi login gagal: ' + signInError.message);
-      }
-
-      if (signInData.user && signInData.session) {
-        setSession(signInData.session);
-        await loadUserProfile(signInData.user.id);
-      }
+      // Now sign in the user using backend endpoint
+      await signIn(email, password, role);
     } catch (error: any) {
       console.error('Signup error:', error);
       throw error;
