@@ -30,7 +30,7 @@ export async function getResidents() {
 
   // Fetch residents in same RT/RW
   const { data, error } = await supabase
-    .from('residents')
+    .from('resident_profiles')
     .select('*')
     .eq('rt', adminProfile.rt)
     .eq('rw', adminProfile.rw)
@@ -42,7 +42,7 @@ export async function getResidents() {
 
 export async function getResidentById(id: string) {
   const { data, error } = await supabase
-    .from('residents')
+    .from('resident_profiles')
     .select('*')
     .eq('id', id)
     .single();
@@ -77,7 +77,7 @@ export async function getFees() {
     .from('fees')
     .select(`
       *,
-      resident:residents(name, house_number, phone, rt, rw)
+      resident:resident_profiles(name, house_number, phone, rt, rw)
     `)
     .eq('rt', adminProfile.rt)
     .eq('rw', adminProfile.rw)
@@ -109,7 +109,7 @@ export async function getPendingFees() {
     .from('fees')
     .select(`
       *,
-      resident:residents(name, house_number, phone)
+      resident:resident_profiles(name, house_number, phone)
     `)
     .eq('status', 'pending')
     .eq('rt', adminProfile.rt)
@@ -146,7 +146,7 @@ export async function createFee(feeData: {
 
   // Get resident to verify RT/RW
   const { data: resident } = await supabase
-    .from('residents')
+    .from('resident_profiles')
     .select('rt, rw')
     .eq('id', feeData.resident_id)
     .single();
@@ -245,7 +245,7 @@ export async function getWasteDeposits() {
     .from('waste_deposits')
     .select(`
       *,
-      resident:residents(name, house_number, phone)
+      resident:resident_profiles(name, house_number, phone)
     `)
     .eq('rt', adminProfile.rt)
     .eq('rw', adminProfile.rw)
@@ -465,7 +465,7 @@ export async function getReportsData() {
 
   // Get all data for reports
   const [residentsData, feesData, wasteData] = await Promise.all([
-    supabase.from('residents')
+    supabase.from('resident_profiles')
       .select('*')
       .eq('rt', adminProfile.rt)
       .eq('rw', adminProfile.rw),
@@ -527,7 +527,7 @@ export async function signupResident(residentData: {
   // In production, this should go through an edge function with service role key
   
   const { data, error } = await supabase
-    .from('residents')
+    .from('resident_profiles')
     .insert({
       email: residentData.email,
       name: residentData.name,
