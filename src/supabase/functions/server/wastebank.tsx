@@ -44,6 +44,17 @@ export async function addWasteDeposit(c: Context) {
     
     const total_value = weight * price_per_kg;
     
+    // Get resident's RT/RW
+    const { data: residentData, error: residentError } = await supabase
+      .from('resident_profiles')
+      .select('rt, rw')
+      .eq('id', resident_id)
+      .single();
+    
+    if (residentError || !residentData) {
+      return c.json({ error: 'Resident not found' }, 404);
+    }
+    
     // Create waste deposit record
     const { data: depositData, error: depositError } = await supabase
       .from('waste_deposits')
@@ -53,6 +64,8 @@ export async function addWasteDeposit(c: Context) {
         weight,
         price_per_kg,
         total_value,
+        rt: residentData.rt,
+        rw: residentData.rw,
         date: new Date().toISOString()
       })
       .select()
@@ -215,7 +228,7 @@ export async function payFeeWithWasteBank(c: Context) {
     // Get resident's balance
     const { data: residentProfile, error: profileError } = await supabase
       .from('resident_profiles')
-      .select('waste_bank_balance, name')
+      .select('waste_bank_balance, name, rt, rw')
       .eq('id', user.id)
       .single();
     
@@ -269,6 +282,8 @@ export async function payFeeWithWasteBank(c: Context) {
         weight: 0,
         price_per_kg: 0,
         total_value: -fee.amount,
+        rt: residentProfile.rt,
+        rw: residentProfile.rw,
         date: new Date().toISOString()
       });
     

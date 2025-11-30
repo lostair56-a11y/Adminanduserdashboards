@@ -5,10 +5,9 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
-import { projectId } from '../../utils/supabase/info';
-import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner@2.0.3';
 import { Loader2 } from 'lucide-react';
+import { updateFee } from '../../lib/db-helpers';
 
 interface FeeRecord {
   id: string;
@@ -56,34 +55,12 @@ export function EditFeeDialog({ open, onOpenChange, fee, onSuccess }: EditFeeDia
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        toast.error('Sesi tidak valid. Silakan login kembali.');
-        return;
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/${fee.id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            amount: parseFloat(formData.amount),
-            month: formData.month,
-            year: parseInt(formData.year),
-            description: formData.description
-          })
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Gagal memperbarui tagihan');
-      }
+      await updateFee(fee.id, {
+        amount: parseFloat(formData.amount),
+        month: formData.month,
+        year: parseInt(formData.year),
+        description: formData.description
+      });
 
       toast.success('Tagihan berhasil diperbarui');
       onSuccess();

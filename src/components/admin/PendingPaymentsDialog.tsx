@@ -3,9 +3,8 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { CheckCircle, XCircle, Eye, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { projectId } from '../../utils/supabase/info';
-import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner@2.0.3';
+import { getPendingFees, verifyPayment } from '../../lib/db-helpers';
 
 interface PendingPaymentsDialogProps {
   open: boolean;
@@ -45,28 +44,8 @@ export function PendingPaymentsDialog({ open, onOpenChange, onVerificationComple
   const fetchPendingPayments = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        return;
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/pending`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setPendingFees(data.fees || []);
-      } else {
-        toast.error('Gagal mengambil data pembayaran pending');
-      }
+      const fees = await getPendingFees();
+      setPendingFees(fees as any);
     } catch (error) {
       console.error('Error fetching pending payments:', error);
       toast.error('Gagal mengambil data pembayaran pending');
@@ -78,41 +57,15 @@ export function PendingPaymentsDialog({ open, onOpenChange, onVerificationComple
   const handleVerifyPayment = async (feeId: string, action: 'approve' | 'reject') => {
     setProcessingId(feeId);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        toast.error('Sesi tidak valid. Silakan login kembali.');
-        return;
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/verify`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            feeId,
-            action
-          })
-        }
+      await verifyPayment(feeId, action);
+      toast.success(
+        action === 'approve' 
+          ? 'Pembayaran berhasil disetujui!' 
+          : 'Pembayaran ditolak'
       );
-
-      if (response.ok) {
-        toast.success(
-          action === 'approve' 
-            ? 'Pembayaran berhasil disetujui!' 
-            : 'Pembayaran ditolak'
-        );
-        fetchPendingPayments();
-        if (onVerificationComplete) {
-          onVerificationComplete();
-        }
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Gagal memverifikasi pembayaran');
+      fetchPendingPayments();
+      if (onVerificationComplete) {
+        onVerificationComplete();
       }
     } catch (error) {
       console.error('Error verifying payment:', error);

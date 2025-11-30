@@ -1,35 +1,36 @@
-import { ResidentProfile } from './resident/ResidentProfile';
-import { useAuth } from '../contexts/AuthContext';
-import type { ResidentProfile as ResidentProfileType } from '../lib/supabase';
-import { toast } from 'sonner@2.0.3';
-import { projectId } from '../utils/supabase/info';
-import { supabase } from '../lib/supabase';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { 
-  Home, 
-  User, 
-  CreditCard, 
-  Calendar, 
-  Leaf, 
-  Bell, 
-  Menu, 
-  X, 
-  LogOut, 
-  History, 
-  FileText, 
-  ArrowRight, 
-  Wallet,
+import { toast } from 'sonner@2.0.3';
+import {
+  Home,
+  Calendar,
+  CreditCard,
+  Menu,
+  X,
+  User,
+  LogOut,
   AlertCircle,
-  Clock 
+  Leaf,
+  Bell,
+  Wallet,
+  ArrowRight,
+  History,
+  FileText,
+  Clock,
 } from 'lucide-react';
 import { FeePaymentDialog } from './resident/FeePaymentDialog';
 import { WasteBankPaymentDialog } from './resident/WasteBankPaymentDialog';
 import { PaymentHistoryDialog } from './resident/PaymentHistoryDialog';
 import { WasteBankHistoryDialog } from './resident/WasteBankHistoryDialog';
 import { NotificationsDialog } from './resident/NotificationsDialog';
+import { ResidentProfile as ResidentProfileComp } from './resident/ResidentProfile';
+import { useAuth } from '../contexts/AuthContext';
+import { ResidentProfile } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import { projectId } from '../utils/supabase/info';
+import { getPublicSchedules } from '../lib/db-helpers';
 
 type MenuItem = 'dashboard' | 'payment-history' | 'wastebank-history' | 'schedules' | 'profile';
 
@@ -40,9 +41,11 @@ interface FeeRecord {
   month: string;
   year: number;
   status: 'paid' | 'unpaid' | 'pending';
-  payment_date?: string;
-  payment_method?: string;
   description?: string;
+  payment_date?: string;
+  payment_proof?: string;
+  due_date: string;
+  created_at: string;
 }
 
 interface Schedule {
@@ -50,14 +53,13 @@ interface Schedule {
   date: string;
   area: string;
   time: string;
-  status: 'scheduled' | 'completed';
-  rt: string;
-  rw: string;
+  status: string;
+  notes?: string;
 }
 
 export function ResidentDashboard() {
   const { signOut, profile, user } = useAuth();
-  const residentProfile = profile as ResidentProfileType;
+  const residentProfile = profile as ResidentProfile;
   const [activeMenu, setActiveMenu] = useState<MenuItem>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showFeePayment, setShowFeePayment] = useState(false);
@@ -124,40 +126,15 @@ export function ResidentDashboard() {
   const fetchSchedules = async () => {
     setSchedulesLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Fetching schedules for resident using direct query');
       
-      if (!session?.access_token) {
-        console.log('No session or access token found for schedules');
-        return;
-      }
-
-      console.log('Fetching schedules for resident');
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/schedules/public`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      console.log('Schedules response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Schedules data received:', data);
-        console.log('Number of schedules:', data.schedules?.length || 0);
-        setSchedules(data.schedules || []);
-      } else {
-        const errorData = await response.json();
-        console.error('Error response from server:', errorData);
-        toast.error('Gagal memuat jadwal: ' + (errorData.error || 'Unknown error'));
-      }
-    } catch (error) {
+      const schedules = await getPublicSchedules();
+      console.log('Schedules data received:', schedules);
+      console.log('Number of schedules:', schedules.length);
+      setSchedules(schedules);
+    } catch (error: any) {
       console.error('Error fetching schedules:', error);
-      toast.error('Gagal memuat jadwal');
+      toast.error('Gagal memuat jadwal: ' + error.message);
     } finally {
       setSchedulesLoading(false);
     }
@@ -560,7 +537,7 @@ export function ResidentDashboard() {
           </Card>
         );
       case 'profile':
-        return <ResidentProfile />;
+        return <ResidentProfileComp />;
       default:
         return null;
     }

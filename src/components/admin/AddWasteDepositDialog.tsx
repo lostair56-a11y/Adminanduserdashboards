@@ -4,9 +4,8 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { supabase } from '../../lib/supabase';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
 import { toast } from 'sonner';
+import { getResidents, createWasteDeposit } from '../../lib/db-helpers';
 
 interface AddWasteDepositDialogProps {
   open: boolean;
@@ -46,23 +45,8 @@ export function AddWasteDepositDialog({ open, onOpenChange, onAdd }: AddWasteDep
 
   const fetchResidents = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/residents`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setResidents(data.residents || []);
-      }
+      const data = await getResidents();
+      setResidents(data as any);
     } catch (error) {
       console.error('Error fetching residents:', error);
     }

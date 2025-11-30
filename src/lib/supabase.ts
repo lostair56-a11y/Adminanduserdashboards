@@ -362,64 +362,99 @@ class SupabaseClient {
         return builder;
       },
 
-      insert: async (values: any) => {
-        try {
-          const response = await fetch(`${this.url}/rest/v1/${table}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': this.key,
-              'Authorization': `Bearer ${this.session?.access_token || this.key}`,
-              'Prefer': 'return=representation',
-            },
-            body: JSON.stringify(values),
-          });
+      insert: (values: any) => {
+        let selectColumns = '*';
+        let shouldReturnSingle = false;
+        
+        const builder = {
+          select: (columns: string = '*') => {
+            selectColumns = columns;
+            return builder;
+          },
+          single: () => {
+            shouldReturnSingle = true;
+            return builder;
+          },
+          then: (resolve: any, reject: any) => {
+            return (async () => {
+              try {
+                const response = await fetch(`${this.url}/rest/v1/${table}?select=${selectColumns}`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': this.key,
+                    'Authorization': `Bearer ${this.session?.access_token || this.key}`,
+                    'Prefer': 'return=representation',
+                    ...(shouldReturnSingle ? { 'Accept': 'application/vnd.pgrst.object+json' } : {}),
+                  },
+                  body: JSON.stringify(values),
+                });
 
-          if (!response.ok) {
-            const error = await response.json();
-            return { data: null, error };
-          }
+                if (!response.ok) {
+                  const error = await response.json();
+                  return reject({ data: null, error });
+                }
 
-          const data = await response.json();
-          return { data, error: null };
-        } catch (error) {
-          return { data: null, error };
-        }
+                const data = await response.json();
+                return resolve({ data, error: null });
+              } catch (error) {
+                return reject({ data: null, error });
+              }
+            })();
+          },
+        };
+
+        return builder;
       },
 
       update: (values: any) => {
-        let filters: string[] = [];
+        let filters: string[] = []
+        let selectColumns = '*';
+        let shouldReturnSingle = false;
 
         const builder = {
           eq: (column: string, value: any) => {
             filters.push(`${column}=eq.${value}`);
             return builder;
           },
-          execute: async () => {
-            const query = filters.length > 0 ? `${this.url}/rest/v1/${table}?${filters.join('&')}` : `${this.url}/rest/v1/${table}`;
-            
-            try {
-              const response = await fetch(query, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'apikey': this.key,
-                  'Authorization': `Bearer ${this.session?.access_token || this.key}`,
-                  'Prefer': 'return=representation',
-                },
-                body: JSON.stringify(values),
-              });
+          select: (columns: string = '*') => {
+            selectColumns = columns;
+            return builder;
+          },
+          single: () => {
+            shouldReturnSingle = true;
+            return builder;
+          },
+          then: (resolve: any, reject: any) => {
+            return (async () => {
+              const query = filters.length > 0 
+                ? `${this.url}/rest/v1/${table}?${filters.join('&')}&select=${selectColumns}` 
+                : `${this.url}/rest/v1/${table}?select=${selectColumns}`;
+              
+              try {
+                const response = await fetch(query, {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': this.key,
+                    'Authorization': `Bearer ${this.session?.access_token || this.key}`,
+                    'Prefer': 'return=representation',
+                    ...(shouldReturnSingle ? { 'Accept': 'application/vnd.pgrst.object+json' } : {}),
+                  },
+                  body: JSON.stringify(values),
+                });
 
-              if (!response.ok) {
-                const error = await response.json();
-                return { data: null, error };
+                if (!response.ok) {
+                  const error = await response.json();
+                  return reject({ data: null, error });
+                }
+
+                const data = await response.json();
+                return resolve({ data, error: null });
+              } catch (error) {
+                return reject({ data: null, error });
               }
-
-              const data = await response.json();
-              return { data, error: null };
-            } catch (error) {
-              return { data: null, error };
-            }
+            })();
           },
         };
 
@@ -434,27 +469,31 @@ class SupabaseClient {
             filters.push(`${column}=eq.${value}`);
             return builder;
           },
-          execute: async () => {
-            const query = filters.length > 0 ? `${this.url}/rest/v1/${table}?${filters.join('&')}` : `${this.url}/rest/v1/${table}`;
-            
-            try {
-              const response = await fetch(query, {
-                method: 'DELETE',
-                headers: {
-                  'apikey': this.key,
-                  'Authorization': `Bearer ${this.session?.access_token || this.key}`,
-                },
-              });
+          then: (resolve: any, reject: any) => {
+            return (async () => {
+              const query = filters.length > 0 
+                ? `${this.url}/rest/v1/${table}?${filters.join('&')}` 
+                : `${this.url}/rest/v1/${table}`;
+              
+              try {
+                const response = await fetch(query, {
+                  method: 'DELETE',
+                  headers: {
+                    'apikey': this.key,
+                    'Authorization': `Bearer ${this.session?.access_token || this.key}`,
+                  },
+                });
 
-              if (!response.ok) {
-                const error = await response.json();
-                return { data: null, error };
+                if (!response.ok) {
+                  const error = await response.json();
+                  return reject({ data: null, error });
+                }
+
+                return resolve({ error: null });
+              } catch (error) {
+                return reject({ error });
               }
-
-              return { data: null, error: null };
-            } catch (error) {
-              return { data: null, error };
-            }
+            })();
           },
         };
 

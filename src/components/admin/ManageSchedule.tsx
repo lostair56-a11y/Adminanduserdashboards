@@ -3,25 +3,19 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Calendar } from '../ui/calendar';
 import { Badge } from '../ui/badge';
-<<<<<<< HEAD
-import { Plus, Calendar as CalendarIcon, CheckCircle, Trash2 } from 'lucide-react';
-import { AddScheduleDialog } from './AddScheduleDialog';
-import { toast } from 'sonner@2.0.3';
-import { projectId } from '../../utils/supabase/info';
-=======
 import { Plus, Calendar as CalendarIcon, Pencil, Trash2, CheckCircle } from 'lucide-react';
 import { AddScheduleDialog } from './AddScheduleDialog';
 import { toast } from 'sonner@2.0.3';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
 import { useAuth } from '../../contexts/AuthContext';
+import { getTrashSchedules, createTrashSchedule, updateSchedule, deleteSchedule } from '../../lib/db-helpers';
 
 interface Schedule {
   id: string;
   date: string;
   area: string;
   time: string;
-  status: 'scheduled' | 'completed';
+  status: 'scheduled' | 'completed' | 'cancelled';
+  notes?: string;
 }
 
 export function ManageSchedule() {
@@ -40,158 +34,63 @@ export function ManageSchedule() {
   }, [session]);
 
   const fetchSchedules = async () => {
-    if (!session?.access_token) return;
-<<<<<<< HEAD
-
-=======
-    
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
     setLoading(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/schedules`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setSchedules(data.schedules || []);
-      } else {
-        console.error('Error fetching schedules:', await response.text());
-        toast.error('Gagal mengambil data jadwal');
-      }
-    } catch (error) {
+      console.log('Fetching schedules using direct query');
+      const schedules = await getTrashSchedules();
+      console.log('Schedules fetched:', schedules.length);
+      setSchedules(schedules);
+    } catch (error: any) {
       console.error('Error fetching schedules:', error);
-      toast.error('Gagal mengambil data jadwal');
+      toast.error('Gagal mengambil data jadwal: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddSchedule = async (scheduleData: { date: string; area: string; time: string; status: 'scheduled' }) => {
-    if (!session?.access_token) return;
-
+  const handleAddSchedule = async (scheduleData: { date: string; area: string; time: string; notes?: string }) => {
     try {
-<<<<<<< HEAD
-      const [jam_mulai, jam_selesai] = scheduleData.time.split(" - ");
-      const adminId = session.user.id;
-
-      const payload = {
-        date: scheduleData.date,
-        area: scheduleData.area,
-        start_time: jam_mulai,
-        end_time: jam_selesai,
-        status: "scheduled",
-        created_by: adminId,
-      };
-
-      console.log("Payload dikirim ke function:", payload);
-
-=======
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/schedules/create`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-<<<<<<< HEAD
-          body: JSON.stringify(payload),
-=======
-          body: JSON.stringify(scheduleData),
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
-        }
-      );
-
-      if (response.ok) {
-        toast.success('Jadwal berhasil ditambahkan');
-        fetchSchedules();
-        setShowAddDialog(false);
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Gagal menambahkan jadwal');
-<<<<<<< HEAD
-        console.error("Response error dari function:", error);
-=======
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
-      }
-    } catch (error) {
+      console.log('Creating schedule:', scheduleData);
+      await createTrashSchedule(scheduleData);
+      toast.success('Jadwal berhasil ditambahkan');
+      fetchSchedules();
+      setShowAddDialog(false);
+    } catch (error: any) {
       console.error('Error adding schedule:', error);
-      toast.error('Gagal menambahkan jadwal');
+      toast.error('Gagal menambahkan jadwal: ' + error.message);
     }
   };
 
   const handleMarkComplete = async (scheduleId: string) => {
-    if (!session?.access_token) return;
-
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/schedules/${scheduleId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ status: 'completed' }),
-        }
-      );
-
-      if (response.ok) {
-        toast.success('Jadwal ditandai selesai');
-        fetchSchedules();
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Gagal mengupdate jadwal');
-      }
-    } catch (error) {
+      console.log('Marking schedule as completed:', scheduleId);
+      await updateSchedule(scheduleId, { status: 'completed' });
+      toast.success('Jadwal ditandai selesai');
+      fetchSchedules();
+    } catch (error: any) {
       console.error('Error updating schedule:', error);
-      toast.error('Gagal mengupdate jadwal');
+      toast.error('Gagal mengupdate jadwal: ' + error.message);
     }
   };
 
   const handleDeleteSchedule = async (scheduleId: string) => {
-    if (!session?.access_token) return;
-
     if (!confirm('Apakah Anda yakin ingin menghapus jadwal ini?')) return;
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/schedules/${scheduleId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        toast.success('Jadwal berhasil dihapus');
-        fetchSchedules();
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Gagal menghapus jadwal');
-      }
-    } catch (error) {
+      console.log('Deleting schedule:', scheduleId);
+      await deleteSchedule(scheduleId);
+      toast.success('Jadwal berhasil dihapus');
+      fetchSchedules();
+    } catch (error: any) {
       console.error('Error deleting schedule:', error);
-      toast.error('Gagal menghapus jadwal');
+      toast.error('Gagal menghapus jadwal: ' + error.message);
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
-<<<<<<< HEAD
-=======
         {/* Calendar */}
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
         <Card>
           <CardHeader>
             <CardTitle>Kalender Pengangkutan</CardTitle>
@@ -207,10 +106,7 @@ export function ManageSchedule() {
           </CardContent>
         </Card>
 
-<<<<<<< HEAD
-=======
         {/* Upcoming Schedules */}
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -281,10 +177,7 @@ export function ManageSchedule() {
         </Card>
       </div>
 
-<<<<<<< HEAD
-=======
       {/* All Schedules List */}
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74
       <Card>
         <CardHeader>
           <CardTitle>Semua Jadwal</CardTitle>
@@ -360,8 +253,4 @@ export function ManageSchedule() {
       />
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 5dbf147d6151a9ca8ee26c21e9cc265a68c87b74

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 interface AddScheduleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (schedule: { date: string; area: string; time: string; status: 'scheduled' }) => void;
+  onAdd: (schedule: { date: string; area: string; time: string; notes?: string }) => void;
 }
 
 // Preset waktu untuk kemudahan pemilihan
@@ -36,6 +36,7 @@ export function AddScheduleDialog({ open, onOpenChange, onAdd }: AddScheduleDial
     date: new Date().toISOString().split('T')[0],
     area: '',
     time: '',
+    notes: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [useCustomArea, setUseCustomArea] = useState(false);
@@ -61,9 +62,9 @@ export function AddScheduleDialog({ open, onOpenChange, onAdd }: AddScheduleDial
 
     setIsSubmitting(true);
     try {
-      await onAdd({ ...formData, status: 'scheduled' });
+      await onAdd({ ...formData });
       // Reset form setelah berhasil
-      setFormData({ date: new Date().toISOString().split('T')[0], area: '', time: '' });
+      setFormData({ date: new Date().toISOString().split('T')[0], area: '', time: '', notes: '' });
       setUseCustomArea(false);
       setUseCustomTime(false);
     } catch (error) {
@@ -75,7 +76,7 @@ export function AddScheduleDialog({ open, onOpenChange, onAdd }: AddScheduleDial
 
   const handleCancel = () => {
     // Reset form saat cancel
-    setFormData({ date: new Date().toISOString().split('T')[0], area: '', time: '' });
+    setFormData({ date: new Date().toISOString().split('T')[0], area: '', time: '', notes: '' });
     setUseCustomArea(false);
     setUseCustomTime(false);
     onOpenChange(false);
@@ -213,6 +214,18 @@ export function AddScheduleDialog({ open, onOpenChange, onAdd }: AddScheduleDial
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Catatan */}
+          <div>
+            <Label htmlFor="notes">Catatan (Opsional)</Label>
+            <Input
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Contoh: Pengangkutan rutin"
+              className="mt-1"
+            />
           </div>
 
           {/* Tombol Aksi */}

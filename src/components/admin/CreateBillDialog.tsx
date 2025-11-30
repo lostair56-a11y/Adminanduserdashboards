@@ -1,8 +1,7 @@
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner@2.0.3';
-import { projectId } from '../../utils/supabase/info';
-import { supabase } from '../../lib/supabase';
 import { useState, useEffect } from 'react';
+import { getResidents, createFee } from '../../lib/db-helpers';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -49,29 +48,8 @@ export function CreateBillDialog({ open, onOpenChange, onSuccess }: CreateBillDi
   const fetchResidents = async () => {
     setLoadingResidents(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        toast.error('Sesi tidak valid');
-        return;
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/residents`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Gagal mengambil data warga');
-      }
-
-      const data = await response.json();
-      setResidents(data.residents || []);
+      const data = await getResidents();
+      setResidents(data as any);
     } catch (error) {
       console.error('Error fetching residents:', error);
       toast.error('Gagal mengambil data warga');
@@ -96,42 +74,17 @@ export function CreateBillDialog({ open, onOpenChange, onSuccess }: CreateBillDi
 
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        toast.error('Sesi tidak valid');
-        return;
-      }
+      // Calculate due date (end of month)
+      const dueDate = new Date(parseInt(year), months.indexOf(month) + 1, 0).toISOString();
 
-      const requestBody: any = {
+      await createFee({
         resident_id: selectedResident,
         amount: numAmount,
         month,
-        year: parseInt(year)
-      };
-      
-      // Only include description if it has a value
-      if (description && description.trim()) {
-        requestBody.description = description.trim();
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/create`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestBody)
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Gagal membuat tagihan');
-      }
+        year: parseInt(year),
+        description: description && description.trim() ? description.trim() : undefined,
+        due_date: dueDate
+      });
 
       const resident = residents.find(r => r.id === selectedResident);
       toast.success(`Tagihan berhasil dibuat untuk ${resident?.name}`);

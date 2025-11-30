@@ -2,9 +2,8 @@ import { CreateBillDialog } from './CreateBillDialog';
 import { EditFeeDialog } from './EditFeeDialog';
 import { PendingPaymentsDialog } from './PendingPaymentsDialog';
 import { toast } from 'sonner@2.0.3';
-import { projectId } from '../../utils/supabase/info';
-import { supabase } from '../../lib/supabase';
 import { useState, useEffect } from 'react';
+import { getResidents, getFees, deleteFee } from '../../lib/db-helpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -57,44 +56,13 @@ export function ManageFees() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const [residentsData, feesData] = await Promise.all([
+        getResidents(),
+        getFees()
+      ]);
       
-      if (!session?.access_token) {
-        toast.error('Sesi tidak valid');
-        return;
-      }
-
-      // Fetch residents
-      const residentsResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/residents`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (residentsResponse.ok) {
-        const residentsData = await residentsResponse.json();
-        setResidents(residentsData.residents || []);
-      }
-
-      // Fetch fees
-      const feesResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (feesResponse.ok) {
-        const feesData = await feesResponse.json();
-        setFeeRecords(feesData.fees || []);
-      }
+      setResidents(residentsData as any);
+      setFeeRecords(feesData as any);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Gagal memuat data');
@@ -138,31 +106,9 @@ export function ManageFees() {
   const handleDeleteFee = async (feeId: string) => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        toast.error('Sesi tidak valid');
-        return;
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/delete-fee`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ fee_id: feeId })
-        }
-      );
-
-      if (response.ok) {
-        toast.success('Tagihan berhasil dihapus');
-        fetchData();
-      } else {
-        toast.error('Gagal menghapus tagihan');
-      }
+      await deleteFee(feeId);
+      toast.success('Tagihan berhasil dihapus');
+      fetchData();
     } catch (error) {
       console.error('Error deleting fee:', error);
       toast.error('Gagal menghapus tagihan');
