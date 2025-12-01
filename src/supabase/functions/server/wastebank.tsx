@@ -76,7 +76,7 @@ export async function addWasteDeposit(c: Context) {
       return c.json({ error: depositError.message }, 400);
     }
     
-    // Update resident's waste bank balance
+    // Get resident's updated balance (after trigger)
     const { data: residentProfile, error: profileError } = await supabase
       .from('resident_profiles')
       .select('waste_bank_balance, name')
@@ -88,17 +88,7 @@ export async function addWasteDeposit(c: Context) {
       return c.json({ error: profileError.message }, 400);
     }
     
-    const newBalance = (residentProfile.waste_bank_balance || 0) + total_value;
-    
-    const { error: updateError } = await supabase
-      .from('resident_profiles')
-      .update({ waste_bank_balance: newBalance })
-      .eq('id', resident_id);
-    
-    if (updateError) {
-      console.error('Error updating balance:', updateError);
-      return c.json({ error: updateError.message }, 400);
-    }
+    const newBalance = residentProfile.waste_bank_balance || 0;
     
     // Create notification for resident
     await supabase
@@ -243,18 +233,19 @@ export async function payFeeWithWasteBank(c: Context) {
       return c.json({ error: 'Saldo bank sampah tidak mencukupi' }, 400);
     }
     
-    const newBalance = currentBalance - fee.amount;
-    
-    // Update resident's balance
-    const { error: updateBalanceError } = await supabase
-      .from('resident_profiles')
-      .update({ waste_bank_balance: newBalance })
-      .eq('id', user.id);
-    
-    if (updateBalanceError) {
-      console.error('Error updating balance:', updateBalanceError);
-      return c.json({ error: updateBalanceError.message }, 400);
-    }
+    // Create waste bank transaction record (trigger will auto-update balance)
+    await supabase
+      .from('waste_deposits')
+      .insert({
+        resident_id: user.id,
+        waste_type: 'Pembayaran Iuran',
+        weight: 0,
+        price_per_kg: 0,
+        total_value: -fee.amount,
+        rt: residentProfile.rt,
+        rw: residentProfile.rw,
+        date: new Date().toISOString()
+      });
     
     // Update fee status to paid
     const { data: updatedFee, error: updateFeeError } = await supabase
@@ -273,19 +264,14 @@ export async function payFeeWithWasteBank(c: Context) {
       return c.json({ error: updateFeeError.message }, 400);
     }
     
-    // Create waste bank transaction record
-    await supabase
-      .from('waste_deposits')
-      .insert({
-        resident_id: user.id,
-        waste_type: 'Pembayaran Iuran',
-        weight: 0,
-        price_per_kg: 0,
-        total_value: -fee.amount,
-        rt: residentProfile.rt,
-        rw: residentProfile.rw,
-        date: new Date().toISOString()
-      });
+    // Get updated balance after payment
+    const { data: updatedProfile } = await supabase
+      .from('resident_profiles')
+      .select('waste_bank_balance')
+      .eq('id', user.id)
+      .single();
+    
+    const newBalance = updatedProfile?.waste_bank_balance || 0;
     
     // Create notification
     await supabase
@@ -496,40 +482,7 @@ export async function deleteWasteDeposit(c: Context) {
     
     const depositId = c.req.param('id');
     
-    // Get deposit to subtract from balance
-    const { data: deposit, error: depositError } = await supabase
-      .from('waste_deposits')
-      .select('resident_id, total_value')
-      .eq('id', depositId)
-      .single();
-    
-    if (depositError || !deposit) {
-      return c.json({ error: 'Deposit not found' }, 404);
-    }
-    
-    // Update resident's balance (subtract the deposit value)
-    const { data: residentProfile, error: profileError } = await supabase
-      .from('resident_profiles')
-      .select('waste_bank_balance')
-      .eq('id', deposit.resident_id)
-      .single();
-    
-    if (profileError) {
-      return c.json({ error: profileError.message }, 400);
-    }
-    
-    const newBalance = (residentProfile.waste_bank_balance || 0) - deposit.total_value;
-    
-    const { error: balanceError } = await supabase
-      .from('resident_profiles')
-      .update({ waste_bank_balance: newBalance >= 0 ? newBalance : 0 })
-      .eq('id', deposit.resident_id);
-    
-    if (balanceError) {
-      console.error('Error updating balance:', balanceError);
-    }
-    
-    // Delete deposit
+    // Delete deposit (trigger will auto-update balance)
     const { error: deleteError } = await supabase
       .from('waste_deposits')
       .delete()

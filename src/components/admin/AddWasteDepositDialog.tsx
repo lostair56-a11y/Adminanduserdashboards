@@ -6,6 +6,8 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { getResidents, createWasteDeposit } from '../../lib/db-helpers';
+import { supabase } from '../../lib/supabase';
+import { projectId } from '../../utils/supabase/info';
 
 interface AddWasteDepositDialogProps {
   open: boolean;
