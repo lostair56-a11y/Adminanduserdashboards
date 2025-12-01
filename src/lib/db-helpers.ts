@@ -127,17 +127,18 @@ export async function getPendingFees() {
     return [];
   }
 
-  // Fetch fees with status 'unpaid' that have payment_proof (waiting for verification)
+  // Fetch fees with status 'unpaid' that have payment_date filled (waiting for verification)
   const { data, error } = await supabase
     .from('fee_payments')
     .select('*, resident:resident_profiles(name, house_number, phone)')
     .eq('status', 'unpaid')
     .in('resident_id', residentIds)
-    .neq('payment_proof', null)
     .order('payment_date', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  
+  // Filter for fees that have payment_date (payment submitted, waiting for verification)
+  return (data || []).filter(fee => fee.payment_date != null);
 }
 
 export async function createFee(feeData: {
@@ -230,15 +231,21 @@ export async function updateFee(feeId: string, updates: {
 
 export async function verifyPayment(feeId: string, action: 'approve' | 'reject') {
   const status = action === 'approve' ? 'paid' : 'unpaid';
-  const verified_at = action === 'approve' ? new Date().toISOString() : null;
+
+  const updateData: any = { 
+    status
+  };
+  
+  // If rejecting, clear payment info
+  if (action === 'reject') {
+    updateData.payment_proof = null;
+    updateData.payment_date = null;
+    updateData.payment_method = null;
+  }
 
   const { data, error } = await supabase
     .from('fee_payments')
-    .update({ 
-      status,
-      verified_at,
-      payment_proof: action === 'reject' ? null : undefined
-    })
+    .update(updateData)
     .eq('id', feeId)
     .select()
     .single();

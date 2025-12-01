@@ -298,7 +298,8 @@ export async function payFee(c: Context) {
       .from('fee_payments')
       .update({
         payment_date: new Date().toISOString(),
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        payment_proof: paymentProofUrl  // IMPORTANT: Save payment_proof URL in database
       })
       .eq('id', feeId)
       .select()

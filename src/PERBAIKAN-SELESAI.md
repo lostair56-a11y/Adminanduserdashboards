@@ -22,7 +22,17 @@
 1. Fetch semua `resident_id` dari `resident_profiles` berdasarkan RT/RW admin
 2. Filter `fee_payments` menggunakan `.in('resident_id', residentIds)`
 
-### 3. Enhanced Debugging
+### 3. Invalid NULL Check Syntax
+**Masalah:**
+- Query `getPendingFees()` menggunakan `.neq('payment_proof', null)` yang invalid
+- Error: `400 Bad Request` pada URL query `payment_proof=neq.null`
+- Supabase PostgREST tidak menerima format tersebut
+
+**Solusi:**
+✅ Mengubah dari `.neq('payment_proof', null)` ke `.not('payment_proof', 'is', null)`
+✅ Ini adalah syntax yang benar untuk mengecek NOT NULL di Supabase
+
+### 4. Enhanced Debugging
 **Solusi:**
 ✅ Menambahkan console logging detail di `ResidentDashboard.tsx`:
 - Log saat fetchFees dipanggil
@@ -34,7 +44,7 @@
 
 ### `/lib/db-helpers.ts`
 - ✅ `getFees()` - Menggunakan `fee_payments` table dengan filter `resident_id`
-- ✅ `getPendingFees()` - Menggunakan `fee_payments` table dengan filter `resident_id`
+- ✅ `getPendingFees()` - Menggunakan `fee_payments` table dengan filter `resident_id` dan `.not('payment_proof', 'is', null)`
 - ✅ `updateFee()` - Menggunakan `fee_payments` table
 - ✅ `verifyPayment()` - Menggunakan `fee_payments` table  
 - ✅ `deleteFee()` - Menggunakan `fee_payments` table
@@ -112,3 +122,37 @@ fee_payments
 - Hapus console.log setelah confirmed working di production
 - Tambah error boundary untuk better error handling
 - Implementasi retry logic untuk failed API calls
+
+## Catatan Penting: Supabase Query Syntax
+
+### Checking for NOT NULL values
+❌ **SALAH:**
+```typescript
+.neq('payment_proof', null)  // Akan error 400 Bad Request
+```
+
+✅ **BENAR:**
+```typescript
+.not('payment_proof', 'is', null)  // Format yang benar untuk NOT NULL
+```
+
+### Checking for NULL values
+✅ **BENAR:**
+```typescript
+.is('payment_proof', null)  // Format yang benar untuk IS NULL
+```
+
+### Other useful filters
+```typescript
+// Greater than or equal
+.gte('date', '2024-01-01')
+
+// Less than
+.lt('amount', 1000000)
+
+// IN array
+.in('resident_id', ['id1', 'id2', 'id3'])
+
+// NOT IN array  
+.not('status', 'in', '(paid,pending)')
+```
