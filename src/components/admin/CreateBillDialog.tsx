@@ -77,12 +77,26 @@ export function CreateBillDialog({ open, onOpenChange, onSuccess }: CreateBillDi
       // Calculate due date (end of month)
       const dueDate = new Date(parseInt(year), months.indexOf(month) + 1, 0).toISOString();
 
+      // Combine month/year with description for display
+      const fullDescription = description && description.trim() 
+        ? `Iuran ${month} ${year} - ${description.trim()}`
+        : `Iuran ${month} ${year}`;
+
+      console.log('🎫 Creating fee with data:', {
+        resident_id: selectedResident,
+        amount: numAmount,
+        month: month,
+        year: parseInt(year),
+        description: fullDescription,
+        due_date: dueDate
+      });
+
       await createFee({
         resident_id: selectedResident,
         amount: numAmount,
-        month,
+        month: month,
         year: parseInt(year),
-        description: description && description.trim() ? description.trim() : undefined,
+        description: fullDescription,
         due_date: dueDate
       });
 

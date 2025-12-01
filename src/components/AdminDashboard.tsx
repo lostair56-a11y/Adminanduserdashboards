@@ -1,26 +1,22 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { LayoutDashboard, Users, DollarSign, Recycle, Calendar, FileText, LogOut, Menu, Bell, User, X } from 'lucide-react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { LayoutDashboard, Users, DollarSign, Trash2, Calendar, FileText, LogOut, Menu, X, User, Database, ClipboardCheck, Bell } from 'lucide-react';
 import { StatsOverview } from './admin/StatsOverview';
 import { ManageResidents } from './admin/ManageResidents';
 import { ManageFees } from './admin/ManageFees';
 import { ManageWasteBank } from './admin/ManageWasteBank';
 import { ManageSchedule } from './admin/ManageSchedule';
 import { Reports } from './admin/Reports';
-import { AdminProfile } from './admin/AdminProfile';
 import { PendingPaymentsDialog } from './admin/PendingPaymentsDialog';
-import { useAuth } from '../contexts/AuthContext';
-import type { AdminProfile as AdminProfileType } from '../lib/supabase';
 import { supabase } from '../lib/supabase';
-import { projectId } from '../utils/supabase/info';
+import { getPendingFees } from '../lib/db-helpers';
 
-type MenuItem = 'dashboard' | 'residents' | 'fees' | 'wastebank' | 'schedule' | 'reports' | 'profile';
+type MenuItem = 'dashboard' | 'residents' | 'fees' | 'wastebank' | 'schedule' | 'reports';
 
 export function AdminDashboard() {
   const { signOut, profile } = useAuth();
-  const adminProfile = profile as AdminProfileType;
   const [activeMenu, setActiveMenu] = useState<MenuItem>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPendingPayments, setShowPendingPayments] = useState(false);
@@ -28,35 +24,14 @@ export function AdminDashboard() {
 
   useEffect(() => {
     fetchPendingCount();
-    
-    // Poll every 30 seconds for new pending payments
     const interval = setInterval(fetchPendingCount, 30000);
-    
     return () => clearInterval(interval);
   }, []);
 
   const fetchPendingCount = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        return;
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/pending`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setPendingCount(data.fees?.length || 0);
-      }
+      const data = await getPendingFees();
+      setPendingCount(data.length);
     } catch (error) {
       console.error('Error fetching pending count:', error);
     }
@@ -74,10 +49,9 @@ export function AdminDashboard() {
     { id: 'dashboard' as MenuItem, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'residents' as MenuItem, label: 'Kelola Data Warga', icon: Users },
     { id: 'fees' as MenuItem, label: 'Kelola Iuran & Pembayaran', icon: DollarSign },
-    { id: 'wastebank' as MenuItem, label: 'Kelola Bank Sampah', icon: Trash2 },
+    { id: 'wastebank' as MenuItem, label: 'Kelola Bank Sampah', icon: Recycle },
     { id: 'schedule' as MenuItem, label: 'Kelola Jadwal Pengangkutan', icon: Calendar },
     { id: 'reports' as MenuItem, label: 'Laporan', icon: FileText },
-    { id: 'profile' as MenuItem, label: 'Profil Admin', icon: User },
   ];
 
   const renderContent = () => {
@@ -94,8 +68,6 @@ export function AdminDashboard() {
         return <ManageSchedule />;
       case 'reports':
         return <Reports />;
-      case 'profile':
-        return <AdminProfile />;
       default:
         return <StatsOverview />;
     }
@@ -143,7 +115,7 @@ export function AdminDashboard() {
               </div>
               <div className="text-left flex-1">
                 <p className="text-sm text-white">Admin RT</p>
-                <p className="text-xs text-blue-200">{adminProfile?.position || 'Ketua RT 003'}</p>
+                <p className="text-xs text-blue-200">{profile?.position || 'Ketua RT 003'}</p>
               </div>
             </button>
           </div>
@@ -239,9 +211,9 @@ export function AdminDashboard() {
 
               {/* Admin Profile Badge */}
               <div className="hidden md:flex flex-col items-end">
-                <span className="text-sm">{adminProfile?.name || 'Admin'}</span>
+                <span className="text-sm">{profile?.name || 'Admin'}</span>
                 <span className="text-xs text-gray-500">
-                  RT {adminProfile?.rt || '0'} / RW {adminProfile?.rw || '0'} - {adminProfile?.kelurahan || 'N/A'}
+                  RT {profile?.rt || '0'} / RW {profile?.rw || '0'} - {profile?.kelurahan || 'N/A'}
                 </span>
               </div>
 

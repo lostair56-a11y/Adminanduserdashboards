@@ -25,12 +25,16 @@ interface FeeRecord {
   id: string;
   resident_id: string;
   amount: number;
-  month: string;
-  year: number;
   status: 'paid' | 'unpaid';
   payment_date?: string;
   payment_method?: string;
   description?: string;
+  due_date?: string;
+  resident?: {
+    name: string;
+    house_number: string;
+    phone: string;
+  };
 }
 
 interface Resident {
@@ -86,8 +90,7 @@ export function ManageFees() {
     const residentAddress = getResidentAddress(record.resident_id);
     return (
       residentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      residentAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.month.toLowerCase().includes(searchQuery.toLowerCase())
+      residentAddress.toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
 
@@ -201,7 +204,6 @@ export function ManageFees() {
                   <TableRow>
                     <TableHead>Nama Warga</TableHead>
                     <TableHead>Alamat</TableHead>
-                    <TableHead>Periode</TableHead>
                     <TableHead>Jumlah</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Tanggal Bayar</TableHead>
@@ -214,7 +216,6 @@ export function ManageFees() {
                     <TableRow key={record.id}>
                       <TableCell>{getResidentName(record.resident_id)}</TableCell>
                       <TableCell>{getResidentAddress(record.resident_id)}</TableCell>
-                      <TableCell>{record.month} {record.year}</TableCell>
                       <TableCell>Rp {record.amount.toLocaleString('id-ID')}</TableCell>
                       <TableCell>
                         <Badge variant={record.status === 'paid' ? 'default' : 'destructive'} className="gap-1">
@@ -255,23 +256,18 @@ export function ManageFees() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setDeletingFee(record);
-                          }}
+                          onClick={() => setEditingFee(record)}
                         >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Hapus
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setEditingFee(record);
-                            setShowPendingPayments(true);
-                          }}
+                          onClick={() => setDeletingFee(record)}
                         >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Hapus
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -295,13 +291,16 @@ export function ManageFees() {
         onVerificationComplete={fetchData}
       />
 
-      <EditFeeDialog
-        open={showPendingPayments}
-        onOpenChange={setShowPendingPayments}
-        onVerificationComplete={fetchData}
-      />
+      {editingFee && (
+        <EditFeeDialog
+          open={!!editingFee}
+          onOpenChange={(open) => !open && setEditingFee(null)}
+          fee={editingFee}
+          onSuccess={fetchData}
+        />
+      )}
 
-      <AlertDialog open={deletingFee !== null} onOpenChange={setDeletingFee}>
+      <AlertDialog open={deletingFee !== null} onOpenChange={() => setDeletingFee(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Tagihan</AlertDialogTitle>

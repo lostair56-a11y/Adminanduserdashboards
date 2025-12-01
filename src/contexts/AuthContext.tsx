@@ -74,46 +74,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('Loading user profile for:', userId);
       }
       
-      // Try to load admin profile
-      const { data: adminData, error: adminError } = await supabase
-        .from('admin_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      // Try to load admin profile first
+      try {
+        const { data: adminData, error: adminError } = await supabase
+          .from('admin_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Admin profile query result:', { adminData, adminError });
-      }
-
-      if (adminData) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('User is admin, setting profile');
+          console.log('Admin profile query result:', { adminData, adminError });
         }
-        setProfile(adminData);
-        setUserRole('admin');
-        setLoading(false);
-        return 'admin';
+
+        if (adminData && !adminError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('User is admin, setting profile');
+          }
+          setProfile(adminData);
+          setUserRole('admin');
+          setLoading(false);
+          return 'admin';
+        }
+      } catch (adminQueryError) {
+        // Silently catch admin profile query errors (user is likely a resident)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Admin profile not found (expected for residents)');
+        }
       }
 
       // Try to load resident profile
-      const { data: residentData, error: residentError } = await supabase
-        .from('resident_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      try {
+        const { data: residentData, error: residentError } = await supabase
+          .from('resident_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Resident profile query result:', { residentData, residentError });
-      }
-
-      if (residentData) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('User is resident, setting profile');
+          console.log('Resident profile query result:', { residentData, residentError });
         }
-        setProfile(residentData);
-        setUserRole('resident');
-        setLoading(false);
-        return 'resident';
+
+        if (residentData && !residentError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('User is resident, setting profile');
+          }
+          setProfile(residentData);
+          setUserRole('resident');
+          setLoading(false);
+          return 'resident';
+        }
+      } catch (residentQueryError) {
+        console.error('Error loading resident profile:', residentQueryError);
       }
 
       if (process.env.NODE_ENV === 'development') {

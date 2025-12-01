@@ -6,6 +6,7 @@
  */
 
 import { supabase } from './supabase';
+import { projectId } from '../utils/supabase/info';
 
 // ============================================
 // RESIDENTS
@@ -72,15 +73,24 @@ export async function getFees() {
     throw new Error('Admin profile not found');
   }
 
+  // Get all residents in same RT/RW
+  const { data: residents } = await supabase
+    .from('resident_profiles')
+    .select('id')
+    .eq('rt', adminProfile.rt)
+    .eq('rw', adminProfile.rw);
+
+  const residentIds = residents?.map(r => r.id) || [];
+
+  if (residentIds.length === 0) {
+    return [];
+  }
+
   // Fetch fees with resident info
   const { data, error } = await supabase
-    .from('fees')
-    .select(`
-      *,
-      resident:resident_profiles(name, house_number, phone, rt, rw)
-    `)
-    .eq('rt', adminProfile.rt)
-    .eq('rw', adminProfile.rw)
+    .from('fee_payments')
+    .select('*, resident:resident_profiles(name, house_number, phone, rt, rw)')
+    .in('resident_id', residentIds)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -104,16 +114,26 @@ export async function getPendingFees() {
     throw new Error('Admin profile not found');
   }
 
-  // Fetch pending fees
-  const { data, error } = await supabase
-    .from('fees')
-    .select(`
-      *,
-      resident:resident_profiles(name, house_number, phone)
-    `)
-    .eq('status', 'pending')
+  // Get all residents in same RT/RW
+  const { data: residents } = await supabase
+    .from('resident_profiles')
+    .select('id')
     .eq('rt', adminProfile.rt)
-    .eq('rw', adminProfile.rw)
+    .eq('rw', adminProfile.rw);
+
+  const residentIds = residents?.map(r => r.id) || [];
+
+  if (residentIds.length === 0) {
+    return [];
+  }
+
+  // Fetch fees with status 'unpaid' that have payment_proof (waiting for verification)
+  const { data, error } = await supabase
+    .from('fee_payments')
+    .select('*, resident:resident_profiles(name, house_number, phone)')
+    .eq('status', 'unpaid')
+    .in('resident_id', residentIds)
+    .neq('payment_proof', null)
     .order('payment_date', { ascending: false });
 
   if (error) throw error;
@@ -123,8 +143,8 @@ export async function getPendingFees() {
 export async function createFee(feeData: {
   resident_id: string;
   amount: number;
-  month: string;
-  year: number;
+  month?: string;
+  year?: number;
   description?: string;
   due_date: string;
 }) {
@@ -133,6 +153,8 @@ export async function createFee(feeData: {
   if (!session) {
     throw new Error('No active session');
   }
+
+  console.log('🎫 createFee called with:', feeData);
 
   // Get admin's RT/RW
   const { data: adminProfile } = await supabase.from('admin_profiles')
@@ -144,44 +166,59 @@ export async function createFee(feeData: {
     throw new Error('Admin profile not found');
   }
 
+  console.log('👨‍💼 Admin profile:', adminProfile);
+
   // Get resident to verify RT/RW
   const { data: resident } = await supabase
     .from('resident_profiles')
-    .select('rt, rw')
+    .select('rt, rw, name')
     .eq('id', feeData.resident_id)
     .single();
+
+  console.log('🏠 Resident profile:', resident);
 
   if (!resident || resident.rt !== adminProfile.rt || resident.rw !== adminProfile.rw) {
     throw new Error('Resident not found or not in your RT/RW');
   }
 
-  // Create fee
-  const { data, error } = await supabase
-    .from('fees')
-    .insert({
-      ...feeData,
-      rt: adminProfile.rt,
-      rw: adminProfile.rw,
-      status: 'unpaid',
-      created_by: session.user.id
-    })
-    .select()
-    .single();
+  // Use backend server endpoint to create fee
+  const response = await fetch(
+    `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/create`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        resident_id: feeData.resident_id,
+        amount: feeData.amount,
+        month: feeData.month || new Date().toLocaleString('id-ID', { month: 'long' }),
+        year: feeData.year || new Date().getFullYear(),
+        description: feeData.description
+      })
+    }
+  );
 
-  if (error) throw error;
-  return data;
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('❌ Error from server:', errorData);
+    throw new Error(errorData.error || 'Failed to create fee');
+  }
+
+  const result = await response.json();
+  console.log('✅ Fee created successfully:', result);
+  return result.fee;
 }
 
 export async function updateFee(feeId: string, updates: {
   amount?: number;
-  month?: string;
-  year?: number;
   description?: string;
   due_date?: string;
   status?: string;
 }) {
   const { data, error } = await supabase
-    .from('fees')
+    .from('fee_payments')
     .update(updates)
     .eq('id', feeId)
     .select()
@@ -196,7 +233,7 @@ export async function verifyPayment(feeId: string, action: 'approve' | 'reject')
   const verified_at = action === 'approve' ? new Date().toISOString() : null;
 
   const { data, error } = await supabase
-    .from('fees')
+    .from('fee_payments')
     .update({ 
       status,
       verified_at,
@@ -212,7 +249,7 @@ export async function verifyPayment(feeId: string, action: 'approve' | 'reject')
 
 export async function deleteFee(feeId: string) {
   const { error } = await supabase
-    .from('fees')
+    .from('fee_payments')
     .delete()
     .eq('id', feeId);
 
@@ -243,10 +280,7 @@ export async function getWasteDeposits() {
   // Fetch waste deposits
   const { data, error } = await supabase
     .from('waste_deposits')
-    .select(`
-      *,
-      resident:resident_profiles(name, house_number, phone)
-    `)
+    .select('*, resident:resident_profiles(name, house_number, phone)')
     .eq('rt', adminProfile.rt)
     .eq('rw', adminProfile.rw)
     .order('deposit_date', { ascending: false });
@@ -284,8 +318,7 @@ export async function createWasteDeposit(depositData: {
     .insert({
       ...depositData,
       rt: adminProfile.rt,
-      rw: adminProfile.rw,
-      created_by: session.user.id
+      rw: adminProfile.rw
     })
     .select()
     .single();
@@ -463,17 +496,22 @@ export async function getReportsData() {
     throw new Error('Admin profile not found');
   }
 
-  // Get all data for reports
-  const [residentsData, feesData, wasteData] = await Promise.all([
-    supabase.from('resident_profiles')
-      .select('*')
-      .eq('rt', adminProfile.rt)
-      .eq('rw', adminProfile.rw),
-    
-    supabase.from('fees')
-      .select('*')
-      .eq('rt', adminProfile.rt)
-      .eq('rw', adminProfile.rw),
+  // Get all residents in same RT/RW first
+  const { data: residents } = await supabase
+    .from('resident_profiles')
+    .select('*')
+    .eq('rt', adminProfile.rt)
+    .eq('rw', adminProfile.rw);
+
+  const residentIds = residents?.map(r => r.id) || [];
+
+  // Get fees and waste data filtered by resident_ids
+  const [feesData, wasteData] = await Promise.all([
+    residentIds.length > 0
+      ? supabase.from('fee_payments')
+          .select('*')
+          .in('resident_id', residentIds)
+      : Promise.resolve({ data: [] }),
     
     supabase.from('waste_deposits')
       .select('*')
@@ -482,7 +520,7 @@ export async function getReportsData() {
   ]);
 
   return {
-    residents: residentsData.data || [],
+    residents: residents || [],
     fees: feesData.data || [],
     wasteDeposits: wasteData.data || []
   };

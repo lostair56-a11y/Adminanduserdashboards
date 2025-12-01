@@ -33,6 +33,18 @@ const getSupabaseClient = () => {
   return createClient(supabaseUrl, supabaseServiceRoleKey);
 };
 
+// Create Supabase client with anon key for auth operations
+const getSupabaseAuthClient = () => {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase credentials not found');
+  }
+  
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
+
 // Initialize storage bucket on startup
 const initializeStorage = async () => {
   try {
@@ -111,16 +123,67 @@ const initializeDemoAdmin = async () => {
         if (profileError) {
           console.error('Error creating demo admin profile:', profileError);
         } else {
-          console.log('Demo admin created successfully with credentials:');
+          console.log('✅ Demo admin created successfully!');
           console.log('  Email: admin@rt.com');
           console.log('  Password: admin123');
+          console.log('  RT/RW: 003/005');
         }
       }
     } else {
       console.log('Admin(s) already exist');
     }
+    
+    // Also create a demo resident for testing
+    const { data: existingResidents } = await supabase
+      .from('resident_profiles')
+      .select('id')
+      .limit(1);
+    
+    if (!existingResidents || existingResidents.length === 0) {
+      console.log('No resident found, creating demo resident...');
+      
+      const { data: residentAuthData, error: residentAuthError } = await supabase.auth.admin.createUser({
+        email: 'warga@rt.com',
+        password: 'warga123',
+        email_confirm: true,
+        user_metadata: { role: 'resident' }
+      });
+      
+      if (residentAuthError) {
+        console.error('Error creating demo resident auth:', residentAuthError);
+        return;
+      }
+      
+      if (residentAuthData.user) {
+        const { error: residentProfileError } = await supabase
+          .from('resident_profiles')
+          .insert({
+            id: residentAuthData.user.id,
+            email: 'warga@rt.com',
+            name: 'Warga Demo',
+            house_number: '10',
+            rt: '003',
+            rw: '005',
+            phone: '081234567891',
+            address: 'Jl. Contoh No. 10',
+            kelurahan: 'Kelurahan Demo',
+            kecamatan: 'Kecamatan Demo',
+            kota: 'Jakarta',
+            waste_bank_balance: 0
+          });
+        
+        if (residentProfileError) {
+          console.error('Error creating demo resident profile:', residentProfileError);
+        } else {
+          console.log('✅ Demo resident created successfully!');
+          console.log('  Email: warga@rt.com');
+          console.log('  Password: warga123');
+          console.log('  RT/RW: 003/005');
+        }
+      }
+    }
   } catch (error) {
-    console.error('Error initializing demo admin:', error);
+    console.error('Error initializing demo users:', error);
   }
 };
 
@@ -138,10 +201,11 @@ app.post('/make-server-64eec44a/login', async (c) => {
       return c.json({ error: 'Email, password, dan role wajib diisi' }, 400);
     }
     
-    const supabase = getSupabaseClient();
+    // Use auth client (with anon key) for authentication
+    const authClient = getSupabaseAuthClient();
     
-    // Sign in with email and password using admin API
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    // Sign in with email and password
+    const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
       email,
       password,
     });
@@ -172,7 +236,7 @@ app.post('/make-server-64eec44a/login', async (c) => {
       
       // Provide user-friendly error messages
       if (signInError.message.includes('Invalid login credentials')) {
-        return c.json({ error: 'Email atau password salah' }, 401);
+        return c.json({ error: 'Email atau password salah. Pastikan Anda sudah registrasi terlebih dahulu.' }, 401);
       }
       
       return c.json({ error: signInError.message }, 401);
@@ -182,7 +246,8 @@ app.post('/make-server-64eec44a/login', async (c) => {
       return c.json({ error: 'Login gagal' }, 401);
     }
     
-    // Verify role by checking profile tables
+    // Use service role client to query profiles (bypasses RLS)
+    const supabase = getSupabaseClient();
     const userId = signInData.user.id;
     
     if (role === 'admin') {

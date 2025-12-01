@@ -13,9 +13,8 @@ interface FeeRecord {
   id: string;
   resident_id: string;
   amount: number;
-  month: string;
-  year: number;
   description?: string;
+  due_date?: string;
 }
 
 interface EditFeeDialogProps {
@@ -34,18 +33,16 @@ export function EditFeeDialog({ open, onOpenChange, fee, onSuccess }: EditFeeDia
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     amount: '',
-    month: '',
-    year: '',
-    description: ''
+    description: '',
+    due_date: ''
   });
 
   useEffect(() => {
     if (fee) {
       setFormData({
         amount: fee.amount.toString(),
-        month: fee.month,
-        year: fee.year.toString(),
-        description: fee.description || ''
+        description: fee.description || '',
+        due_date: fee.due_date ? new Date(fee.due_date).toISOString().split('T')[0] : ''
       });
     }
   }, [fee]);
@@ -57,9 +54,8 @@ export function EditFeeDialog({ open, onOpenChange, fee, onSuccess }: EditFeeDia
     try {
       await updateFee(fee.id, {
         amount: parseFloat(formData.amount),
-        month: formData.month,
-        year: parseInt(formData.year),
-        description: formData.description
+        description: formData.description,
+        due_date: formData.due_date
       });
 
       toast.success('Tagihan berhasil diperbarui');
@@ -93,36 +89,6 @@ export function EditFeeDialog({ open, onOpenChange, fee, onSuccess }: EditFeeDia
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="month">Bulan *</Label>
-              <Select value={formData.month} onValueChange={(value) => setFormData({ ...formData, month: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih bulan" />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((month) => (
-                    <SelectItem key={month} value={month}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="year">Tahun *</Label>
-              <Input
-                id="year"
-                type="number"
-                value={formData.year}
-                onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                placeholder="2024"
-                required
-              />
-            </div>
-          </div>
-
           <div>
             <Label htmlFor="description">Keterangan</Label>
             <Textarea
@@ -131,6 +97,16 @@ export function EditFeeDialog({ open, onOpenChange, fee, onSuccess }: EditFeeDia
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Iuran bulanan RT"
               rows={3}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="due_date">Tanggal Jatuh Tempo</Label>
+            <Input
+              id="due_date"
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
             />
           </div>
 

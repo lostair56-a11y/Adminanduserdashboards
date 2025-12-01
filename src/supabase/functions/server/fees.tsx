@@ -124,10 +124,15 @@ export async function getFees(c: Context) {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     const supabase = getSupabaseClient();
     
+    console.log('📋 getFees called with access token present:', !!accessToken);
+    
     const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
     if (authError || !user) {
+      console.error('❌ Auth error in getFees:', authError);
       return c.json({ error: 'Unauthorized' }, 401);
     }
+    
+    console.log('👤 User ID:', user.id);
 
     // Check if user is admin or resident
     const { data: adminProfile } = await supabase
@@ -136,10 +141,14 @@ export async function getFees(c: Context) {
       .eq('id', user.id)
       .maybeSingle(); // Use maybeSingle to avoid error when not found
 
+    console.log('🔍 Admin profile check:', adminProfile);
+
     let residentIds: string[] = [];
 
     if (adminProfile && adminProfile.rt && adminProfile.rw) {
       // Admin: Get only residents from same RT/RW
+      console.log('👨‍💼 User is Admin, fetching residents for RT/RW:', adminProfile.rt, adminProfile.rw);
+      
       const { data: residents, error: residentsError } = await supabase
         .from('resident_profiles')
         .select('id')
@@ -147,19 +156,24 @@ export async function getFees(c: Context) {
         .eq('rw', adminProfile.rw);
 
       if (residentsError) {
-        console.error('Error fetching residents:', residentsError);
+        console.error('❌ Error fetching residents:', residentsError);
         return c.json({ error: residentsError.message }, 400);
       }
 
       residentIds = residents?.map(r => r.id) || [];
+      console.log('👥 Found residents:', residentIds.length);
     } else {
       // Resident: Get their own fees
+      console.log('🏠 User is Resident, fetching own fees');
       residentIds = [user.id];
     }
 
     if (residentIds.length === 0) {
+      console.log('⚠️ No resident IDs found, returning empty fees');
       return c.json({ fees: [] });
     }
+
+    console.log('🔎 Fetching fees for resident IDs:', residentIds);
 
     const residentId = c.req.param('residentId');
     
@@ -170,15 +184,19 @@ export async function getFees(c: Context) {
       .order('created_at', { ascending: false });
 
     if (residentId && residentId !== 'undefined') {
+      console.log('🎯 Filtering by specific resident ID:', residentId);
       query = query.eq('resident_id', residentId);
     }
 
     const { data: fees, error } = await query;
 
     if (error) {
-      console.error('Error fetching fees:', error);
+      console.error('❌ Error fetching fees from database:', error);
       return c.json({ error: error.message }, 400);
     }
+
+    console.log('✅ Fees fetched successfully, count:', fees?.length || 0);
+    console.log('📊 Fees data:', JSON.stringify(fees, null, 2));
 
     // Fetch descriptions from KV store
     const feesWithDescriptions = await Promise.all(
@@ -191,9 +209,10 @@ export async function getFees(c: Context) {
       })
     );
 
+    console.log('🎉 Returning fees with descriptions:', feesWithDescriptions.length);
     return c.json({ fees: feesWithDescriptions });
   } catch (error) {
-    console.error('Error in get fees:', error);
+    console.error('💥 Error in get fees:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 }

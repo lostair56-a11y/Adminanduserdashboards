@@ -42,10 +42,12 @@ interface FeeRecord {
   year: number;
   status: 'paid' | 'unpaid' | 'pending';
   description?: string;
-  payment_date?: string;
-  payment_proof?: string;
-  due_date: string;
-  created_at: string;
+  payment_date?: string | null;
+  payment_proof?: string | null;
+  payment_method?: string | null;
+  due_date?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface Schedule {
@@ -87,11 +89,12 @@ export function ResidentDashboard() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.access_token) {
-        console.log('No session or access token found');
+        console.log('❌ No session or access token found');
         return;
       }
 
-      console.log('Fetching fees for user:', user?.id);
+      console.log('📋 Fetching fees for user:', user?.id);
+      console.log('🔑 Access token present:', !!session.access_token);
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees`,
@@ -103,22 +106,44 @@ export function ResidentDashboard() {
         }
       );
 
-      console.log('Fees response status:', response.status);
+      console.log('📡 Fees response status:', response.status);
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Fees data received:', data);
-        console.log('Number of fees:', data.fees?.length || 0);
-        setFees(data.fees || []);
+        console.log('✅ Fees data received:', data);
+        console.log('📊 Number of fees:', data.fees?.length || 0);
+        if (data.fees && data.fees.length > 0) {
+          console.log('📝 First fee:', data.fees[0]);
+          console.log('📝 First fee fields:', Object.keys(data.fees[0]));
+          console.log('📝 All fees:', JSON.stringify(data.fees, null, 2));
+        }
+        
+        // IMPORTANT: Set fees to state
+        const feesArray = data.fees || [];
+        console.log('💾 Setting fees to state, count:', feesArray.length);
+        setFees(feesArray);
+        
+        // Debug: log filtered fees AFTER setting state
+        setTimeout(() => {
+          const unpaid = feesArray.filter((f: any) => f.status === 'unpaid');
+          const paid = feesArray.filter((f: any) => f.status === 'paid');
+          console.log('🔴 Unpaid fees count:', unpaid.length);
+          console.log('✅ Paid fees count:', paid.length);
+          if (unpaid.length > 0) {
+            console.log('🔴 First unpaid fee:', unpaid[0]);
+          }
+          console.log('📦 Current fees state should be:', feesArray.length);
+        }, 100);
       } else {
         const errorData = await response.json();
-        console.error('Error response from server:', errorData);
+        console.error('❌ Error response from server:', errorData);
         toast.error('Gagal memuat tagihan: ' + (errorData.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error fetching fees:', error);
+      console.error('💥 Error fetching fees:', error);
       toast.error('Gagal memuat tagihan');
     } finally {
+      console.log('🏁 Setting loading to false');
       setLoading(false);
     }
   };
@@ -177,6 +202,15 @@ export function ResidentDashboard() {
   ];
 
   const renderContent = () => {
+    // Debug rendering
+    console.log('🎨 RENDERING - activeMenu:', activeMenu);
+    console.log('🎨 RENDERING - loading:', loading);
+    console.log('🎨 RENDERING - fees.length:', fees.length);
+    console.log('🎨 RENDERING - unpaidFees.length:', unpaidFees.length);
+    console.log('🎨 RENDERING - paidFees.length:', paidFees.length);
+    console.log('🎨 RENDERING - fees:', fees);
+    console.log('🎨 RENDERING - unpaidFees:', unpaidFees);
+    
     switch (activeMenu) {
       case 'dashboard':
         return (

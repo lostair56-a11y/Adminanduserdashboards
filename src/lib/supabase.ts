@@ -290,6 +290,12 @@ class SupabaseClient {
               });
 
               if (!response.ok) {
+                // Handle 406 error (Not Acceptable) - usually RLS policy blocking access
+                if (response.status === 406) {
+                  console.log('Single query: Access denied or no data (406)');
+                  return { data: null, error: null };
+                }
+                
                 const error = await response.json();
                 
                 // If no rows found, return null data without error
