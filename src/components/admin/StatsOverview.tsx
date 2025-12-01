@@ -3,8 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { DollarSign, Users, Leaf, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export function StatsOverview() {
+  const { user, profile, userRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalFees: 0,
@@ -16,25 +18,28 @@ export function StatsOverview() {
   });
 
   useEffect(() => {
-    loadStats();
-  }, []);
+    if (user && profile && userRole === 'admin') {
+      loadStats();
+    } else {
+      setLoading(false);
+    }
+  }, [user, profile, userRole]); // Re-run when auth data changes
 
   const loadStats = async () => {
     try {
-      // Get current admin's location
-      const { data: { user } } = await supabase.auth.getUser();
+      setLoading(true);
       
-      if (!user) {
+      // Use user from AuthContext instead of calling auth.getUser()
+      if (!user || userRole !== 'admin' || !profile) {
+        setLoading(false);
         return;
       }
 
-      const { data: adminProfile } = await supabase
-        .from('admin_profiles')
-        .select('rt, rw')
-        .eq('id', user.id)
-        .single();
+      // Cast profile to AdminProfile to access rt and rw
+      const adminProfile = profile as any;
 
-      if (!adminProfile) {
+      if (!adminProfile.rt || !adminProfile.rw) {
+        setLoading(false);
         return;
       }
 
@@ -61,6 +66,7 @@ export function StatsOverview() {
           unpaidCount: 0,
           participationRate: 0,
         });
+        setLoading(false);
         return;
       }
 

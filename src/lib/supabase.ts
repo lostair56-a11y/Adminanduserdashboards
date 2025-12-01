@@ -140,12 +140,20 @@ class SupabaseClient {
 
         if (!response.ok) {
           const error = await response.json();
+          
+          // If unauthorized or forbidden, clear the session
+          if (response.status === 401 || response.status === 403) {
+            console.log('⚠️ Auth token invalid or expired, clearing session');
+            this.saveSession(null);
+          }
+          
           return { data: { user: null }, error };
         }
 
         const user = await response.json();
         return { data: { user }, error: null };
       } catch (error) {
+        console.error('❌ Error in getUser:', error);
         return { data: { user: null }, error };
       }
     },
