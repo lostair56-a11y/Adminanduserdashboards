@@ -268,7 +268,8 @@ export async function verifyPayment(feeId: string, action: 'approve' | 'reject')
   
   // If rejecting, clear payment info
   if (action === 'reject') {
-    updateData.payment_proof = null;
+    // NOTE: payment_proof column disabled until added to database
+    // updateData.payment_proof = null;
     updateData.payment_date = null;
     updateData.payment_method = null;
   }

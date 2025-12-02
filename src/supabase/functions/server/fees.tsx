@@ -294,12 +294,14 @@ export async function payFee(c: Context) {
     
     // Update fee with payment info but keep status as unpaid (waiting for admin verification)
     // We use unpaid status with payment_date/method filled to indicate pending verification
+    // NOTE: payment_proof removed temporarily until column is added to database
+    // Run: ALTER TABLE fee_payments ADD COLUMN payment_proof TEXT;
     const { data: updatedFee, error: updateError } = await supabase
       .from('fee_payments')
       .update({
         payment_date: new Date().toISOString(),
         payment_method: paymentMethod,
-        payment_proof: paymentProofUrl  // IMPORTANT: Save payment_proof URL in database
+        // payment_proof: paymentProofUrl  // Disabled - column doesn't exist yet
       })
       .eq('id', feeId)
       .select()

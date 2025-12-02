@@ -9,11 +9,12 @@ import { ManageFees } from './admin/ManageFees';
 import { ManageWasteBank } from './admin/ManageWasteBank';
 import { ManageSchedule } from './admin/ManageSchedule';
 import { Reports } from './admin/Reports';
+import { AdminProfile } from './admin/AdminProfile';
 import { PendingPaymentsDialog } from './admin/PendingPaymentsDialog';
 import { supabase } from '../lib/supabase';
 import { getPendingFees } from '../lib/db-helpers';
 
-type MenuItem = 'dashboard' | 'residents' | 'fees' | 'wastebank' | 'schedule' | 'reports';
+type MenuItem = 'dashboard' | 'residents' | 'fees' | 'wastebank' | 'schedule' | 'reports' | 'profile';
 
 export function AdminDashboard() {
   const { signOut, profile } = useAuth();
@@ -68,6 +69,8 @@ export function AdminDashboard() {
         return <ManageSchedule />;
       case 'reports':
         return <Reports />;
+      case 'profile':
+        return <AdminProfile />;
       default:
         return <StatsOverview />;
     }
@@ -184,7 +187,7 @@ export function AdminDashboard() {
               </Button>
               <div>
                 <h1 className="bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-                  {menuItems.find((item) => item.id === activeMenu)?.label || 'Dashboard'}
+                  {activeMenu === 'profile' ? 'Profil Admin' : (menuItems.find((item) => item.id === activeMenu)?.label || 'Dashboard')}
                 </h1>
               </div>
             </div>

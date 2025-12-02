@@ -235,6 +235,7 @@ export function ResidentDashboard() {
     { id: 'payment-history' as MenuItem, label: 'Riwayat Iuran', icon: History },
     { id: 'wastebank-history' as MenuItem, label: 'Riwayat Bank Sampah', icon: FileText },
     { id: 'schedules' as MenuItem, label: 'Jadwal Pengangkutan', icon: Calendar },
+    { id: 'profile' as MenuItem, label: 'Profil', icon: User },
   ];
 
   const renderContent = () => {

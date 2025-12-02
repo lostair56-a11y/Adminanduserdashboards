@@ -136,16 +136,17 @@ export function FeePaymentDialog({ open, onOpenChange, amount, feeId, onPaymentS
       );
 
       if (response.ok) {
-        // WORKAROUND: Manually update payment_proof in database
-        // This ensures payment_proof is saved even if backend hasn't deployed the change yet
-        try {
-          await supabase
-            .from('fee_payments')
-            .update({ payment_proof: paymentProof })
-            .eq('id', feeId);
-        } catch (err) {
-          console.error('Error updating payment_proof:', err);
-        }
+        // NOTE: payment_proof column needs to be added to database first
+        // Run this SQL in Supabase: ALTER TABLE fee_payments ADD COLUMN payment_proof TEXT;
+        // Temporarily disabled to prevent PGRST204 error
+        // try {
+        //   await supabase
+        //     .from('fee_payments')
+        //     .update({ payment_proof: paymentProof })
+        //     .eq('id', feeId);
+        // } catch (err) {
+        //   console.error('Error updating payment_proof:', err);
+        // }
         
         toast.success('Pembayaran berhasil dicatat! Menunggu verifikasi Admin RT.');
         onOpenChange(false);
