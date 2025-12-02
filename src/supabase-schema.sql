@@ -54,6 +54,8 @@ CREATE TABLE waste_deposits (
   price_per_kg INTEGER NOT NULL,
   total_value INTEGER NOT NULL,
   date DATE NOT NULL,
+  rt TEXT,
+  rw TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

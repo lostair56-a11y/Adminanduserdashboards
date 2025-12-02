@@ -59,6 +59,14 @@ interface Schedule {
   notes?: string;
 }
 
+interface WasteTransaction {
+  id: string;
+  waste_type: string;
+  weight: number;
+  total_value: number;
+  date: string;
+}
+
 export function ResidentDashboard() {
   const { signOut, profile, user } = useAuth();
   const residentProfile = profile as ResidentProfile;
@@ -71,8 +79,10 @@ export function ResidentDashboard() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [fees, setFees] = useState<FeeRecord[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [wasteTransactions, setWasteTransactions] = useState<WasteTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [schedulesLoading, setSchedulesLoading] = useState(true);
+  const [wasteLoading, setWasteLoading] = useState(true);
   const [selectedFeeId, setSelectedFeeId] = useState<string | undefined>();
   const [selectedFeeAmount, setSelectedFeeAmount] = useState<number>(0);
 
@@ -80,6 +90,7 @@ export function ResidentDashboard() {
     if (user?.id) {
       fetchFees();
       fetchSchedules();
+      fetchWasteTransactions();
     }
   }, [user]);
 
@@ -162,6 +173,31 @@ export function ResidentDashboard() {
       toast.error('Gagal memuat jadwal: ' + error.message);
     } finally {
       setSchedulesLoading(false);
+    }
+  };
+
+  const fetchWasteTransactions = async () => {
+    setWasteLoading(true);
+    try {
+      console.log('Fetching waste transactions for resident using direct query');
+      
+      const { data, error } = await supabase
+        .from('waste_deposits')
+        .select('*')
+        .eq('resident_id', user?.id)
+        .order('date', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching waste transactions:', error);
+      } else {
+        console.log('Waste transactions data received:', data);
+        console.log('Number of transactions:', data?.length || 0);
+        setWasteTransactions(data || []);
+      }
+    } catch (error: any) {
+      console.error('Error fetching waste transactions:', error);
+    } finally {
+      setWasteLoading(false);
     }
   };
 
@@ -563,10 +599,47 @@ export function ResidentDashboard() {
               <CardDescription>Detail setoran dan penggunaan saldo bank sampah</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-12 text-gray-500">
-                <FileText className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                <p>Belum ada transaksi bank sampah</p>
-              </div>
+              {wasteLoading ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Memuat data...</p>
+                </div>
+              ) : wasteTransactions.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <FileText className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>Belum ada transaksi bank sampah</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {wasteTransactions.map((transaction) => (
+                    <div key={transaction.id} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-medium">
+                            {new Date(transaction.date).toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric'
+                            })}
+                          </p>
+                          <p className="text-sm text-gray-600">{transaction.waste_type}</p>
+                        </div>
+                        <Badge variant="default">Selesai</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Berat</p>
+                          <p>{transaction.weight} kg</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Nilai</p>
+                          <p className="text-green-600">Rp {transaction.total_value.toLocaleString('id-ID')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         );
@@ -734,7 +807,10 @@ export function ResidentDashboard() {
         feeId={selectedFeeId}
         amount={selectedFeeAmount}
         balance={residentData.wasteBankBalance}
-        onSuccess={fetchFees}
+        onSuccess={() => {
+          fetchFees();
+          fetchWasteTransactions();
+        }}
       />
       <PaymentHistoryDialog
         open={showPaymentHistory}

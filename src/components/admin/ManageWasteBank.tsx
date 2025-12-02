@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Plus } from 'lucide-react';
 import { AddWasteDepositDialog } from './AddWasteDepositDialog';
 import { useAuth } from '../../contexts/AuthContext';
-import { projectId } from '../../utils/supabase/info';
+import { getWasteDeposits } from '../../lib/db-helpers';
 
 interface WasteDeposit {
   id: string;
@@ -55,21 +55,10 @@ export function ManageWasteBank() {
     try {
       if (!session?.access_token) return;
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/wastebank/deposits`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const actualDeposits = (data.deposits || []).filter((d: WasteDeposit) => d.total_value > 0);
-        setDeposits(actualDeposits);
-      }
+      const data = await getWasteDeposits();
+      // Filter only actual deposits (positive values), not payments
+      const actualDeposits = data.filter((d: WasteDeposit) => d.total_value > 0);
+      setDeposits(actualDeposits as any);
     } catch (error) {
       console.error('Error fetching deposits:', error);
     }
@@ -79,20 +68,23 @@ export function ManageWasteBank() {
     try {
       if (!session?.access_token) return;
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/wastebank/stats`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        }
-      );
+      const data = await getWasteDeposits();
+      
+      // Calculate stats for current month
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      
+      const monthlyDeposits = data.filter((d: WasteDeposit) => {
+        const depositMonth = d.date.substring(0, 7); // Get YYYY-MM
+        return depositMonth === currentMonth && d.total_value > 0;
+      });
 
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data.stats);
-      }
+      setStats({
+        totalTransactions: monthlyDeposits.length,
+        totalWeight: monthlyDeposits.reduce((sum, d) => sum + Number(d.weight), 0),
+        totalValue: monthlyDeposits.reduce((sum, d) => sum + Number(d.total_value), 0),
+        month: now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+      });
     } catch (error) {
       console.error('Error fetching stats:', error);
     }

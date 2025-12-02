@@ -182,34 +182,44 @@ export async function createFee(feeData: {
     throw new Error('Resident not found or not in your RT/RW');
   }
 
-  // Use backend server endpoint to create fee
-  const response = await fetch(
-    `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/create`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        resident_id: feeData.resident_id,
-        amount: feeData.amount,
-        month: feeData.month || new Date().toLocaleString('id-ID', { month: 'long' }),
-        year: feeData.year || new Date().getFullYear(),
-        description: feeData.description
-      })
-    }
-  );
+  // Check for duplicate bill (same resident, month, year)
+  const monthToCheck = feeData.month || new Date().toLocaleString('id-ID', { month: 'long' });
+  const yearToCheck = feeData.year || new Date().getFullYear();
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    console.error('❌ Error from server:', errorData);
-    throw new Error(errorData.error || 'Failed to create fee');
+  const { data: existingFee } = await supabase
+    .from('fee_payments')
+    .select('id, status')
+    .eq('resident_id', feeData.resident_id)
+    .eq('month', monthToCheck)
+    .eq('year', yearToCheck)
+    .maybeSingle();
+
+  if (existingFee) {
+    throw new Error('Tagihan untuk bulan ini sudah ada');
   }
 
-  const result = await response.json();
-  console.log('✅ Fee created successfully:', result);
-  return result.fee;
+  // Create fee directly in database
+  const { data, error } = await supabase
+    .from('fee_payments')
+    .insert({
+      resident_id: feeData.resident_id,
+      amount: feeData.amount,
+      month: monthToCheck,
+      year: yearToCheck,
+      description: feeData.description,
+      due_date: feeData.due_date,
+      status: 'unpaid'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Error creating fee:', error);
+    throw error;
+  }
+
+  console.log('✅ Fee created successfully:', data);
+  return data;
 }
 
 export async function updateFee(feeId: string, updates: {
@@ -290,7 +300,7 @@ export async function getWasteDeposits() {
     .select('*, resident:resident_profiles(name, house_number, phone)')
     .eq('rt', adminProfile.rt)
     .eq('rw', adminProfile.rw)
-    .order('deposit_date', { ascending: false });
+    .order('date', { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -319,11 +329,19 @@ export async function createWasteDeposit(depositData: {
     throw new Error('Admin profile not found');
   }
 
-  // Create deposit
+  // Calculate price_per_kg from total value and weight
+  const price_per_kg = Math.round(depositData.value / depositData.weight_kg);
+
+  // Create deposit with correct column names
   const { data, error } = await supabase
     .from('waste_deposits')
     .insert({
-      ...depositData,
+      resident_id: depositData.resident_id,
+      waste_type: depositData.waste_type,
+      weight: depositData.weight_kg,
+      price_per_kg: price_per_kg,
+      total_value: depositData.value,
+      date: depositData.deposit_date.split('T')[0], // Extract date part only
       rt: adminProfile.rt,
       rw: adminProfile.rw
     })

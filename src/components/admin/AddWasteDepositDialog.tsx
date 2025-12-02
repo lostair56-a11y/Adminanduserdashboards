@@ -6,8 +6,6 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { getResidents, createWasteDeposit } from '../../lib/db-helpers';
-import { supabase } from '../../lib/supabase';
-import { projectId } from '../../utils/supabase/info';
 
 interface AddWasteDepositDialogProps {
   open: boolean;
@@ -65,50 +63,48 @@ export function AddWasteDepositDialog({ open, onOpenChange, onAdd }: AddWasteDep
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validasi form
+    if (!formData.residentId) {
+      toast.error('Silakan pilih warga terlebih dahulu');
+      return;
+    }
+    
+    if (!formData.wasteType) {
+      toast.error('Silakan pilih jenis sampah terlebih dahulu');
+      return;
+    }
+    
+    if (formData.weight <= 0) {
+      toast.error('Berat sampah harus lebih dari 0 kg');
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Sesi berakhir, silakan login kembali');
-        return;
-      }
+      const totalValue = formData.weight * formData.pricePerKg;
+      
+      await createWasteDeposit({
+        resident_id: formData.residentId,
+        waste_type: formData.wasteType,
+        weight_kg: formData.weight,
+        value: totalValue,
+        deposit_date: new Date().toISOString()
+      });
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/wastebank/deposit`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            resident_id: formData.residentId,
-            waste_type: formData.wasteType,
-            weight: formData.weight,
-            price_per_kg: formData.pricePerKg
-          })
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(`Setoran berhasil ditambahkan. Saldo baru: Rp ${data.newBalance.toLocaleString('id-ID')}`);
-        setFormData({
-          residentId: '',
-          wasteType: '',
-          weight: 0,
-          pricePerKg: 0,
-        });
-        onAdd();
-        onOpenChange(false);
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Gagal menambahkan setoran');
-      }
+      toast.success(`Setoran berhasil ditambahkan. Nilai: Rp ${totalValue.toLocaleString('id-ID')}`);
+      setFormData({
+        residentId: '',
+        wasteType: '',
+        weight: 0,
+        pricePerKg: 0,
+      });
+      onAdd();
+      onOpenChange(false);
     } catch (error) {
       console.error('Error adding deposit:', error);
-      toast.error('Terjadi kesalahan saat menambahkan setoran');
+      toast.error(error instanceof Error ? error.message : 'Gagal menambahkan setoran');
     } finally {
       setLoading(false);
     }
@@ -176,7 +172,11 @@ export function AddWasteDepositDialog({ open, onOpenChange, onAdd }: AddWasteDep
             <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               Batal
             </Button>
-            <Button type="submit" className="flex-1" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="flex-1" 
+              disabled={loading || !formData.residentId || !formData.wasteType || formData.weight <= 0}
+            >
               {loading ? 'Menyimpan...' : 'Tambah Setoran'}
             </Button>
           </div>

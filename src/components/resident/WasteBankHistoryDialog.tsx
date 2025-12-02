@@ -3,7 +3,6 @@ import { Badge } from '../ui/badge';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
 
 interface WasteBankHistoryDialogProps {
   open: boolean;
@@ -15,7 +14,7 @@ interface Transaction {
   waste_type: string;
   weight: number;
   total_value: number;
-  deposit_date: string;
+  date: string;
 }
 
 export function WasteBankHistoryDialog({ open, onOpenChange }: WasteBankHistoryDialogProps) {
@@ -34,19 +33,17 @@ export function WasteBankHistoryDialog({ open, onOpenChange }: WasteBankHistoryD
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/wastebank/deposits`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        }
-      );
+      // Get resident's waste deposits directly from database
+      const { data, error } = await supabase
+        .from('waste_deposits')
+        .select('*')
+        .eq('resident_id', session.user.id)
+        .order('date', { ascending: false });
 
-      if (response.ok) {
-        const data = await response.json();
-        setTransactions(data.deposits || []);
+      if (error) {
+        console.error('Error fetching waste deposits:', error);
+      } else {
+        setTransactions(data || []);
       }
     } catch (error) {
       console.error('Error fetching waste bank history:', error);
@@ -86,7 +83,7 @@ export function WasteBankHistoryDialog({ open, onOpenChange }: WasteBankHistoryD
                     <div className="flex-1">
                       <p className="mb-1">{description}</p>
                       <p className="text-sm text-gray-600">
-                        {new Date(transaction.deposit_date).toLocaleDateString('id-ID', {
+                        {new Date(transaction.date).toLocaleDateString('id-ID', {
                           day: 'numeric',
                           month: 'long',
                           year: 'numeric',

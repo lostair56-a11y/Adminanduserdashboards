@@ -395,10 +395,10 @@ export async function updateWasteDeposit(c: Context) {
       return c.json({ error: 'Missing required fields' }, 400);
     }
     
-    // Get old deposit to calculate balance difference
+    // Get old deposit to get resident_id
     const { data: oldDeposit, error: oldDepositError } = await supabase
       .from('waste_deposits')
-      .select('*, resident_id, total_value')
+      .select('resident_id')
       .eq('id', depositId)
       .single();
     
@@ -407,9 +407,8 @@ export async function updateWasteDeposit(c: Context) {
     }
     
     const newTotalValue = weight * price_per_kg;
-    const balanceDiff = newTotalValue - oldDeposit.total_value;
     
-    // Update deposit
+    // Update deposit (trigger will auto-update balance)
     const { data: updatedDeposit, error: updateError } = await supabase
       .from('waste_deposits')
       .update({
@@ -427,7 +426,7 @@ export async function updateWasteDeposit(c: Context) {
       return c.json({ error: updateError.message }, 400);
     }
     
-    // Update resident's balance
+    // Get resident's updated balance (after trigger)
     const { data: residentProfile, error: profileError } = await supabase
       .from('resident_profiles')
       .select('waste_bank_balance')
@@ -438,17 +437,7 @@ export async function updateWasteDeposit(c: Context) {
       return c.json({ error: profileError.message }, 400);
     }
     
-    const newBalance = (residentProfile.waste_bank_balance || 0) + balanceDiff;
-    
-    const { error: balanceError } = await supabase
-      .from('resident_profiles')
-      .update({ waste_bank_balance: newBalance })
-      .eq('id', oldDeposit.resident_id);
-    
-    if (balanceError) {
-      console.error('Error updating balance:', balanceError);
-      return c.json({ error: balanceError.message }, 400);
-    }
+    const newBalance = residentProfile.waste_bank_balance || 0;
     
     return c.json({ success: true, deposit: updatedDeposit, newBalance });
   } catch (error) {

@@ -1,12 +1,13 @@
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner@2.0.3';
 import { useState, useEffect } from 'react';
-import { getResidents, createFee } from '../../lib/db-helpers';
+import { getResidents, createFee, getFees } from '../../lib/db-helpers';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { AlertCircle } from 'lucide-react';
 
 interface Resident {
   id: string;
@@ -38,10 +39,13 @@ export function CreateBillDialog({ open, onOpenChange, onSuccess }: CreateBillDi
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingResidents, setLoadingResidents] = useState(false);
+  const [existingFees, setExistingFees] = useState<any[]>([]);
+  const [duplicateWarning, setDuplicateWarning] = useState('');
 
   useEffect(() => {
     if (open) {
       fetchResidents();
+      fetchExistingFees();
     }
   }, [open]);
 
@@ -57,6 +61,37 @@ export function CreateBillDialog({ open, onOpenChange, onSuccess }: CreateBillDi
       setLoadingResidents(false);
     }
   };
+
+  const fetchExistingFees = async () => {
+    try {
+      const fees = await getFees();
+      setExistingFees(fees);
+    } catch (error) {
+      console.error('Error fetching fees:', error);
+    }
+  };
+
+  // Check for duplicate bill when resident or month/year changes
+  useEffect(() => {
+    if (selectedResident && month && year) {
+      const duplicate = existingFees.find(
+        (fee: any) => 
+          fee.resident_id === selectedResident && 
+          fee.month === month && 
+          fee.year === parseInt(year)
+      );
+      
+      if (duplicate) {
+        const resident = residents.find(r => r.id === selectedResident);
+        const statusText = duplicate.status === 'paid' ? 'sudah dibayar' : 'belum dibayar';
+        setDuplicateWarning(
+          `⚠️ ${resident?.name || 'Warga ini'} sudah memiliki tagihan ${month} ${year} (${statusText}). Pilih bulan/tahun lain atau edit tagihan yang sudah ada.`
+        );
+      } else {
+        setDuplicateWarning('');
+      }
+    }
+  }, [selectedResident, month, year, existingFees, residents]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +166,13 @@ export function CreateBillDialog({ open, onOpenChange, onSuccess }: CreateBillDi
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+            {duplicateWarning && (
+              <div className="flex items-start gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <AlertCircle className="size-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-yellow-800">{duplicateWarning}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="resident">Pilih Warga *</Label>
               <Select value={selectedResident} onValueChange={setSelectedResident} disabled={loadingResidents}>
@@ -216,7 +258,7 @@ export function CreateBillDialog({ open, onOpenChange, onSuccess }: CreateBillDi
             >
               Batal
             </Button>
-            <Button type="submit" disabled={loading || loadingResidents}>
+            <Button type="submit" disabled={loading || loadingResidents || !!duplicateWarning}>
               {loading ? 'Membuat...' : 'Buat Tagihan'}
             </Button>
           </DialogFooter>
