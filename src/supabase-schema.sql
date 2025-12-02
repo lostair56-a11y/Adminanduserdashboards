@@ -40,7 +40,9 @@ CREATE TABLE fee_payments (
   status TEXT NOT NULL CHECK (status IN ('paid', 'unpaid')),
   payment_method TEXT,
   payment_date TIMESTAMPTZ,
+  payment_proof TEXT,
   description TEXT,
+  due_date DATE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(resident_id, month, year)
 );

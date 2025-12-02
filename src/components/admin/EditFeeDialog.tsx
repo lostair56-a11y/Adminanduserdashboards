@@ -33,16 +33,14 @@ export function EditFeeDialog({ open, onOpenChange, fee, onSuccess }: EditFeeDia
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     amount: '',
-    description: '',
-    due_date: ''
+    description: ''
   });
 
   useEffect(() => {
     if (fee) {
       setFormData({
         amount: fee.amount.toString(),
-        description: fee.description || '',
-        due_date: fee.due_date ? new Date(fee.due_date).toISOString().split('T')[0] : ''
+        description: fee.description || ''
       });
     }
   }, [fee]);
@@ -54,8 +52,7 @@ export function EditFeeDialog({ open, onOpenChange, fee, onSuccess }: EditFeeDia
     try {
       await updateFee(fee.id, {
         amount: parseFloat(formData.amount),
-        description: formData.description,
-        due_date: formData.due_date
+        description: formData.description
       });
 
       toast.success('Tagihan berhasil diperbarui');
@@ -97,16 +94,6 @@ export function EditFeeDialog({ open, onOpenChange, fee, onSuccess }: EditFeeDia
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="Iuran bulanan RT"
               rows={3}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="due_date">Tanggal Jatuh Tempo</Label>
-            <Input
-              id="due_date"
-              type="date"
-              value={formData.due_date}
-              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
             />
           </div>
 

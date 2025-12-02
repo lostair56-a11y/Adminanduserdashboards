@@ -147,7 +147,7 @@ export async function createFee(feeData: {
   month?: string;
   year?: number;
   description?: string;
-  due_date: string;
+  due_date?: string; // Optional, not stored in database
 }) {
   const { data: { session } } = await supabase.auth.getSession();
   
@@ -186,19 +186,37 @@ export async function createFee(feeData: {
   const monthToCheck = feeData.month || new Date().toLocaleString('id-ID', { month: 'long' });
   const yearToCheck = feeData.year || new Date().getFullYear();
 
-  const { data: existingFee } = await supabase
+  console.log('🔍 Checking for existing fee:', { resident_id: feeData.resident_id, month: monthToCheck, year: yearToCheck });
+
+  const { data: existingFees, error: checkError } = await supabase
     .from('fee_payments')
     .select('id, status')
     .eq('resident_id', feeData.resident_id)
     .eq('month', monthToCheck)
-    .eq('year', yearToCheck)
-    .maybeSingle();
+    .eq('year', yearToCheck);
 
-  if (existingFee) {
+  if (checkError) {
+    console.error('❌ Error checking for duplicate:', checkError);
+    throw checkError;
+  }
+
+  console.log('📋 Existing fees found:', existingFees?.length || 0);
+
+  if (existingFees && existingFees.length > 0) {
     throw new Error('Tagihan untuk bulan ini sudah ada');
   }
 
+  console.log('💾 Inserting fee with data:', {
+    resident_id: feeData.resident_id,
+    amount: feeData.amount,
+    month: monthToCheck,
+    year: yearToCheck,
+    description: feeData.description,
+    status: 'unpaid'
+  });
+
   // Create fee directly in database
+  // Note: due_date is not included as it's not in the current database schema
   const { data, error } = await supabase
     .from('fee_payments')
     .insert({
@@ -206,8 +224,7 @@ export async function createFee(feeData: {
       amount: feeData.amount,
       month: monthToCheck,
       year: yearToCheck,
-      description: feeData.description,
-      due_date: feeData.due_date,
+      description: feeData.description || null,
       status: 'unpaid'
     })
     .select()
@@ -228,9 +245,12 @@ export async function updateFee(feeId: string, updates: {
   due_date?: string;
   status?: string;
 }) {
+  // Remove due_date from updates as it's not in the current database schema
+  const { due_date, ...validUpdates } = updates;
+  
   const { data, error } = await supabase
     .from('fee_payments')
-    .update(updates)
+    .update(validUpdates)
     .eq('id', feeId)
     .select()
     .single();
