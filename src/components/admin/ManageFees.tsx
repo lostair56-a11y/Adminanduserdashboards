@@ -5,6 +5,7 @@ import { toast } from 'sonner@2.0.3';
 import { useState, useEffect } from 'react';
 import { getResidents, getFees, deleteFee } from '../../lib/db-helpers';
 import { projectId } from '../../utils/supabase/info';
+import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -45,6 +46,7 @@ interface Resident {
 }
 
 export function ManageFees() {
+  const { session } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [feeRecords, setFeeRecords] = useState<FeeRecord[]>([]);
   const [residents, setResidents] = useState<Resident[]>([]);
@@ -103,13 +105,17 @@ export function ManageFees() {
   );
 
   const sendReminder = async (residentId: string, feeId: string) => {
+    if (!session?.access_token) {
+      toast.error('Sesi tidak valid. Silakan login kembali.');
+      return;
+    }
+
     try {
-      const accessToken = localStorage.getItem('sb-access-token');
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/send-reminder`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           resident_id: residentId,
@@ -118,7 +124,8 @@ export function ManageFees() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send reminder');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send reminder');
       }
 
       const residentName = getResidentName(residentId);
