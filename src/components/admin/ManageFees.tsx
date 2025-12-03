@@ -4,6 +4,7 @@ import { PendingPaymentsDialog } from './PendingPaymentsDialog';
 import { toast } from 'sonner@2.0.3';
 import { useState, useEffect } from 'react';
 import { getResidents, getFees, deleteFee } from '../../lib/db-helpers';
+import { projectId } from '../../utils/supabase/info';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
