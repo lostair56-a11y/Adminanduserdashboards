@@ -26,6 +26,7 @@ import { AnimatedCard } from './animations/AnimatedCard';
 import { FloatingElement } from './animations/FloatingElement';
 import { StaggerContainer, StaggerItem } from './animations/StaggerContainer';
 import { GlowingBadge } from './animations/GlowingBadge';
+import { PageTransition } from './animations/PageTransition';
 import { FeePaymentDialog } from './resident/FeePaymentDialog';
 import { WasteBankPaymentDialog } from './resident/WasteBankPaymentDialog';
 import { PaymentHistoryDialog } from './resident/PaymentHistoryDialog';

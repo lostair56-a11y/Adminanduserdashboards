@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'motion/react';
 import { StaggerContainer, StaggerItem } from '../animations/PageTransition';
+import { LoadingSkeleton, CardSkeleton } from '../animations/LoadingSkeleton';
 
 export function StatsOverview() {
   const { user, profile, userRole } = useAuth();
@@ -114,12 +115,12 @@ export function StatsOverview() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="rounded-full h-12 w-12 border-b-2 border-blue-600"
-        />
+      <div className="space-y-6">
+        <CardSkeleton count={4} />
+        <div className="grid gap-6 md:grid-cols-2">
+          <LoadingSkeleton variant="card" className="!h-80" />
+          <LoadingSkeleton variant="card" className="!h-80" />
+        </div>
       </div>
     );
   }

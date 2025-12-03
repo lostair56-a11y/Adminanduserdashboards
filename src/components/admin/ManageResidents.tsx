@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { motion, AnimatePresence } from 'motion/react';
+import { LoadingSkeleton } from '../animations/LoadingSkeleton';
 
 interface ResidentProfile {
   id: string;
@@ -96,13 +97,18 @@ export function ManageResidents() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          className="rounded-full h-12 w-12 border-b-2 border-blue-600"
-        />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Manajemen Data Warga</CardTitle>
+          <CardDescription>Kelola data warga RT</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <LoadingSkeleton variant="input" />
+            <LoadingSkeleton variant="card" count={3} />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
