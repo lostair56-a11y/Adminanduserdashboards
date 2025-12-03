@@ -53,6 +53,7 @@ export function AdminDashboard() {
     { id: 'wastebank' as MenuItem, label: 'Kelola Bank Sampah', icon: Recycle },
     { id: 'schedule' as MenuItem, label: 'Kelola Jadwal Pengangkutan', icon: Calendar },
     { id: 'reports' as MenuItem, label: 'Laporan', icon: FileText },
+    { id: 'profile' as MenuItem, label: 'Profil Admin', icon: User },
   ];
 
   const renderContent = () => {
