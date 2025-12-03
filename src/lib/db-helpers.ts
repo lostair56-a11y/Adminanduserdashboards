@@ -52,6 +52,84 @@ export async function getResidentById(id: string) {
   return data;
 }
 
+export async function updateResident(id: string, updates: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  house_number?: string;
+  address?: string;
+  rt?: string;
+  rw?: string;
+  kelurahan?: string;
+  kecamatan?: string;
+  kota?: string;
+}) {
+  console.log('🔧 updateResident called for ID:', id);
+  console.log('📝 Updates:', updates);
+
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    throw new Error('No active session');
+  }
+
+  console.log('👤 Session user ID:', session.user.id);
+
+  // Get admin's RT/RW to verify permission
+  const { data: adminProfile, error: adminError } = await supabase.from('admin_profiles')
+    .select('rt, rw')
+    .eq('id', session.user.id)
+    .single();
+
+  if (adminError || !adminProfile) {
+    console.error('❌ Admin profile error:', adminError);
+    throw new Error('Admin profile not found');
+  }
+
+  console.log('👨‍💼 Admin RT/RW:', adminProfile);
+
+  // Get resident to verify RT/RW before update
+  const { data: resident, error: residentError } = await supabase
+    .from('resident_profiles')
+    .select('rt, rw')
+    .eq('id', id)
+    .single();
+
+  if (residentError || !resident) {
+    console.error('❌ Resident lookup error:', residentError);
+    throw new Error('Resident not found');
+  }
+
+  console.log('🏠 Resident RT/RW:', resident);
+
+  // Verify admin can only update residents in their RT/RW
+  if (resident.rt !== adminProfile.rt || resident.rw !== adminProfile.rw) {
+    console.error('❌ RT/RW mismatch!');
+    throw new Error('You can only update residents in your RT/RW');
+  }
+
+  console.log('✅ Permission check passed, performing update...');
+
+  // Perform update WITHOUT select to avoid 406 error
+  try {
+    const { error: updateError } = await supabase
+      .from('resident_profiles')
+      .update(updates)
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('❌ Update error:', updateError);
+      throw updateError;
+    }
+
+    console.log('✅ Update completed successfully');
+    return true;
+  } catch (err) {
+    console.error('❌ Exception during update:', err);
+    throw err;
+  }
+}
+
 // ============================================
 // FEES / IURAN
 // ============================================

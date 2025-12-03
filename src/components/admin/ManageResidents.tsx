@@ -51,12 +51,14 @@ export function ManageResidents() {
   }, []);
 
   const loadResidents = async () => {
+    console.log('🔄 Loading residents...');
     setLoading(true);
     try {
       const data = await getResidents();
+      console.log('✅ Residents loaded:', data.length, 'warga');
       setResidents(data as any);
     } catch (error: any) {
-      console.error('Error fetching residents:', error);
+      console.error('❌ Error fetching residents:', error);
       toast.error(error.message || 'Gagal mengambil data warga');
     } finally {
       setLoading(false);
@@ -244,9 +246,17 @@ export function ManageResidents() {
       {editingResident && (
         <EditResidentDialog
           open={!!editingResident}
-          onOpenChange={(open) => !open && setEditingResident(null)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingResident(null);
+            }
+          }}
           resident={editingResident}
-          onSuccess={loadResidents}
+          onSuccess={async () => {
+            console.log('🔄 Edit success, reloading residents...');
+            await loadResidents();
+            console.log('✅ Residents reloaded');
+          }}
         />
       )}
 

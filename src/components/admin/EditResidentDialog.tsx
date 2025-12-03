@@ -65,18 +65,47 @@ export function EditResidentDialog({ open, onOpenChange, resident, onSuccess }: 
     setLoading(true);
 
     try {
-      const { error } = await supabase
+      console.log('📝 Updating resident with data:', formData);
+      console.log('🆔 Resident ID:', resident.id);
+      
+      // Direct update without select() to avoid 406 error
+      const updateResult = await supabase
         .from('resident_profiles')
-        .update(formData)
+        .update({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          house_number: formData.house_number,
+          address: formData.address,
+          rt: formData.rt,
+          rw: formData.rw,
+          kelurahan: formData.kelurahan,
+          kecamatan: formData.kecamatan,
+          kota: formData.kota,
+        })
         .eq('id', resident.id);
 
-      if (error) throw error;
+      console.log('🔄 Update result:', updateResult);
 
+      if (updateResult.error) {
+        throw updateResult.error;
+      }
+
+      console.log('✅ Update successful, refreshing data...');
+      
+      // Refresh data first
+      await onSuccess();
+      console.log('✅ Data refresh completed');
+      
+      // Show success toast
       toast.success('Data warga berhasil diperbarui');
-      onSuccess();
+      
+      // Then close dialog
       onOpenChange(false);
     } catch (error: any) {
-      toast.error('Gagal memperbarui data warga: ' + error.message);
+      console.error('❌ Error updating resident:', error);
+      const errorMessage = error?.message || error?.error_description || 'Terjadi kesalahan';
+      toast.error('Gagal memperbarui data warga: ' + errorMessage);
     } finally {
       setLoading(false);
     }

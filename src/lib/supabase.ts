@@ -295,6 +295,7 @@ class SupabaseClient {
                   'Authorization': `Bearer ${this.session?.access_token || this.key}`,
                   'Accept': 'application/vnd.pgrst.object+json',
                 },
+                cache: 'no-store' as RequestCache,
               });
 
               if (!response.ok) {
@@ -333,6 +334,7 @@ class SupabaseClient {
                   'Authorization': `Bearer ${this.session?.access_token || this.key}`,
                   'Accept': 'application/vnd.pgrst.object+json',
                 },
+                cache: 'no-store' as RequestCache,
               });
 
               if (response.status === 406 || response.status === 404) {
@@ -358,6 +360,7 @@ class SupabaseClient {
                   'apikey': this.key,
                   'Authorization': `Bearer ${this.session?.access_token || this.key}`,
                 },
+                cache: 'no-store' as RequestCache,
               });
 
               if (!response.ok) {
@@ -425,6 +428,7 @@ class SupabaseClient {
         let filters: string[] = []
         let selectColumns = '*';
         let shouldReturnSingle = false;
+        let shouldSelect = false;
 
         const builder = {
           eq: (column: string, value: any) => {
@@ -433,39 +437,89 @@ class SupabaseClient {
           },
           select: (columns: string = '*') => {
             selectColumns = columns;
+            shouldSelect = true;
             return builder;
           },
           single: () => {
             shouldReturnSingle = true;
+            shouldSelect = true;
             return builder;
           },
           then: (resolve: any, reject: any) => {
             return (async () => {
-              const query = filters.length > 0 
-                ? `${this.url}/rest/v1/${table}?${filters.join('&')}&select=${selectColumns}` 
-                : `${this.url}/rest/v1/${table}?select=${selectColumns}`;
+              // Build query URL
+              let query = `${this.url}/rest/v1/${table}`;
+              if (filters.length > 0) {
+                query += `?${filters.join('&')}`;
+              }
+              
+              // Only add select if explicitly requested
+              if (shouldSelect) {
+                query += (filters.length > 0 ? '&' : '?') + `select=${selectColumns}`;
+              }
               
               try {
+                const headers: Record<string, string> = {
+                  'Content-Type': 'application/json',
+                  'apikey': this.key,
+                  'Authorization': `Bearer ${this.session?.access_token || this.key}`,
+                };
+
+                // Only add Prefer header if we want data back
+                if (shouldSelect) {
+                  headers['Prefer'] = 'return=representation';
+                }
+
+                // Only add Accept header for single row returns
+                if (shouldReturnSingle && shouldSelect) {
+                  headers['Accept'] = 'application/vnd.pgrst.object+json';
+                }
+
+                console.log('🌐 UPDATE Request:', {
+                  url: query,
+                  method: 'PATCH',
+                  headers,
+                  body: values
+                });
+
                 const response = await fetch(query, {
                   method: 'PATCH',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': this.key,
-                    'Authorization': `Bearer ${this.session?.access_token || this.key}`,
-                    'Prefer': 'return=representation',
-                    ...(shouldReturnSingle ? { 'Accept': 'application/vnd.pgrst.object+json' } : {}),
-                  },
+                  headers,
                   body: JSON.stringify(values),
                 });
 
+                console.log('📡 UPDATE Response status:', response.status);
+
                 if (!response.ok) {
+                  // Handle 406 error specially
+                  if (response.status === 406) {
+                    console.error('❌ 406 error on UPDATE. Query:', query);
+                    console.error('Headers:', headers);
+                    
+                    // Try to get error details
+                    try {
+                      const error = await response.json();
+                      console.error('Error details:', error);
+                      return reject({ data: null, error });
+                    } catch {
+                      return reject({ data: null, error: { message: '406 Not Acceptable', code: '406' } });
+                    }
+                  }
+
                   const error = await response.json();
                   return reject({ data: null, error });
                 }
 
-                const data = await response.json();
-                return resolve({ data, error: null });
+                // If we expect data back, parse it
+                if (shouldSelect) {
+                  const data = await response.json();
+                  return resolve({ data, error: null });
+                } else {
+                  // No data expected, just success
+                  return resolve({ data: null, error: null });
+                }
               } catch (error) {
+                console.error('❌ Exception in UPDATE:', error);
                 return reject({ data: null, error });
               }
             })();
