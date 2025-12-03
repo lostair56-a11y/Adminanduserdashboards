@@ -3,6 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '../ui/badge';
 import { Bell, Calendar, CheckCircle, Info, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../../contexts/AuthContext';
+import { projectId } from '../../utils/supabase/info';
 
 interface NotificationsDialogProps {
   open: boolean;
@@ -18,9 +20,8 @@ interface Notification {
   created_at: string;
 }
 
-const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'sinnmqksjnvsvwnodogr';
-
 export function NotificationsDialog({ open, onOpenChange }: NotificationsDialogProps) {
+  const { session } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,18 +32,23 @@ export function NotificationsDialog({ open, onOpenChange }: NotificationsDialogP
   }, [open]);
 
   const fetchNotifications = async () => {
+    if (!session?.access_token) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const accessToken = localStorage.getItem('sb-access-token');
       
       const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/notifications`, {
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${session.access_token}`
         }
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch notifications');
       }
 
       const data = await response.json();
@@ -55,13 +61,14 @@ export function NotificationsDialog({ open, onOpenChange }: NotificationsDialogP
   };
 
   const markAsRead = async (notificationId: string) => {
+    if (!session?.access_token) return;
+
     try {
-      const accessToken = localStorage.getItem('sb-access-token');
       
       await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${session.access_token}`
         }
       });
 

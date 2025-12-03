@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner@2.0.3';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Home,
   Calendar,
@@ -19,6 +20,7 @@ import {
   History,
   FileText,
   Clock,
+  Sparkles,
 } from 'lucide-react';
 import { FeePaymentDialog } from './resident/FeePaymentDialog';
 import { WasteBankPaymentDialog } from './resident/WasteBankPaymentDialog';
