@@ -12,6 +12,11 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Search, CheckCircle, XCircle, Bell, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { AnimatedCard } from '../animations/AnimatedCard';
+import { FloatingElement } from '../animations/FloatingElement';
+import { StaggerContainer, StaggerItem } from '../animations/StaggerContainer';
+import { GlowingBadge } from '../animations/GlowingBadge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -154,56 +159,142 @@ export function ManageFees() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Total Terkumpul</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">Rp {totalAmount.toLocaleString('id-ID')}</div>
-            <p className="text-xs text-gray-600 mt-1">Periode berjalan</p>
-          </CardContent>
-        </Card>
+      <StaggerContainer className="grid gap-6 md:grid-cols-3">
+        <StaggerItem>
+          <AnimatedCard variant="slide" delay={0.1}>
+            <Card className="border-l-4 border-l-green-500 shadow-xl hover:shadow-2xl transition-shadow">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <FloatingElement duration={2}>
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  </FloatingElement>
+                  Total Terkumpul
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <motion.div 
+                  className="text-2xl"
+                  animate={{ 
+                    scale: [1, 1.05, 1],
+                    textShadow: [
+                      '0 0 10px rgba(34, 197, 94, 0)',
+                      '0 0 20px rgba(34, 197, 94, 0.3)',
+                      '0 0 10px rgba(34, 197, 94, 0)'
+                    ]
+                  }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  Rp {totalAmount.toLocaleString('id-ID')}
+                </motion.div>
+                <p className="text-xs text-gray-600 mt-1">Periode berjalan</p>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </StaggerItem>
 
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Sudah Bayar</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl text-green-600">{totalPaid} Tagihan</div>
-            <p className="text-xs text-gray-600 mt-1">
-              {feeRecords.length > 0 ? ((totalPaid / feeRecords.length) * 100).toFixed(0) : 0}% dari total
-            </p>
-          </CardContent>
-        </Card>
+        <StaggerItem>
+          <AnimatedCard variant="slide" delay={0.2}>
+            <Card className="border-l-4 border-l-blue-500 shadow-xl hover:shadow-2xl transition-shadow">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <FloatingElement duration={2.5} delay={0.2}>
+                    <CheckCircle className="h-5 w-5 text-blue-500" />
+                  </FloatingElement>
+                  Sudah Bayar
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <motion.div 
+                  className="text-2xl text-green-600"
+                  animate={{ 
+                    scale: [1, 1.08, 1],
+                    rotate: [0, 2, -2, 0]
+                  }}
+                  transition={{ duration: 4, repeat: Infinity }}
+                >
+                  {totalPaid} Tagihan
+                </motion.div>
+                <motion.p 
+                  className="text-xs text-gray-600 mt-1"
+                  animate={{ opacity: [0.6, 1, 0.6] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  {feeRecords.length > 0 ? ((totalPaid / feeRecords.length) * 100).toFixed(0) : 0}% dari total
+                </motion.p>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </StaggerItem>
 
-        <Card className="border-l-4 border-l-red-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Belum Bayar</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl text-red-600">{totalUnpaid} Tagihan</div>
-            <p className="text-xs text-gray-600 mt-1">
-              {feeRecords.length > 0 ? ((totalUnpaid / feeRecords.length) * 100).toFixed(0) : 0}% dari total
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+        <StaggerItem>
+          <AnimatedCard variant="slide" delay={0.3}>
+            <Card className="border-l-4 border-l-red-500 shadow-xl hover:shadow-2xl transition-shadow">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <FloatingElement duration={2} delay={0.4}>
+                    <motion.div
+                      animate={totalUnpaid > 0 ? { 
+                        scale: [1, 1.2, 1],
+                        rotate: [0, -10, 10, 0]
+                      } : {}}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
+                      <XCircle className="h-5 w-5 text-red-500" />
+                    </motion.div>
+                  </FloatingElement>
+                  Belum Bayar
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <motion.div 
+                  className="text-2xl text-red-600"
+                  animate={totalUnpaid > 0 ? { 
+                    scale: [1, 1.15, 1],
+                    textShadow: [
+                      '0 0 10px rgba(220, 38, 38, 0)',
+                      '0 0 25px rgba(220, 38, 38, 0.5)',
+                      '0 0 10px rgba(220, 38, 38, 0)'
+                    ]
+                  } : {}}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  {totalUnpaid} Tagihan
+                </motion.div>
+                <motion.p 
+                  className="text-xs text-gray-600 mt-1"
+                  animate={{ opacity: [0.6, 1, 0.6] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  {feeRecords.length > 0 ? ((totalUnpaid / feeRecords.length) * 100).toFixed(0) : 0}% dari total
+                </motion.p>
+              </CardContent>
+            </Card>
+          </AnimatedCard>
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* Fee Records Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Status Pembayaran Iuran</CardTitle>
-              <CardDescription>Daftar pembayaran iuran warga</CardDescription>
+      <AnimatedCard variant="scale" delay={0.4}>
+        <Card className="border-0 shadow-2xl">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FloatingElement duration={3}>
+                    <Bell className="h-5 w-5 text-blue-500" />
+                  </FloatingElement>
+                  Status Pembayaran Iuran
+                </CardTitle>
+                <CardDescription>Daftar pembayaran iuran warga</CardDescription>
+              </div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button onClick={() => setShowCreateBill(true)} className="bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Buat Tagihan Baru
+                </Button>
+              </motion.div>
             </div>
-            <Button onClick={() => setShowCreateBill(true)} className="bg-gradient-to-r from-blue-600 to-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Buat Tagihan Baru
-            </Button>
-          </div>
-        </CardHeader>
+          </CardHeader>
         <CardContent>
           <div className="mb-4">
             <div className="relative">
@@ -307,7 +398,8 @@ export function ManageFees() {
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </AnimatedCard>
 
       <CreateBillDialog
         open={showCreateBill}

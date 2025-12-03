@@ -7,6 +7,10 @@ import { projectId } from '../../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from 'recharts';
 import { Badge } from '../ui/badge';
+import { motion } from 'motion/react';
+import { AnimatedCard } from '../animations/AnimatedCard';
+import { FloatingElement } from '../animations/FloatingElement';
+import { StaggerContainer, StaggerItem } from '../animations/StaggerContainer';
 
 interface ReportData {
   fees: {
@@ -161,37 +165,109 @@ export function Reports() {
       ) : reportData ? (
         <>
           {/* Laporan Iuran */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Coins className="h-6 w-6 text-blue-600" />
+          <AnimatedCard variant="scale" delay={0.1}>
+            <Card className="border-0 shadow-2xl">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <FloatingElement duration={2}>
+                    <motion.div 
+                      className="p-2 bg-blue-100 rounded-lg"
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+                    >
+                      <Coins className="h-6 w-6 text-blue-600" />
+                    </motion.div>
+                  </FloatingElement>
+                  <div>
+                    <CardTitle>Laporan Iuran</CardTitle>
+                    <CardDescription>Rekap pembayaran iuran bulan {monthLabel} {selectedYear}</CardDescription>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle>Laporan Iuran</CardTitle>
-                  <CardDescription>Rekap pembayaran iuran bulan {monthLabel} {selectedYear}</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-4 mb-6">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Total Iuran</p>
-                  <p className="text-2xl">{reportData.fees.total}</p>
-                </div>
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Sudah Bayar</p>
-                  <p className="text-2xl text-green-600">{reportData.fees.paid}</p>
-                </div>
-                <div className="p-4 bg-amber-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Belum Bayar</p>
-                  <p className="text-2xl text-amber-600">{reportData.fees.pending}</p>
-                </div>
-                <div className="p-4 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Total Terkumpul</p>
-                  <p className="text-xl text-purple-600">{formatCurrency(reportData.fees.paidAmount)}</p>
-                </div>
-              </div>
+              </CardHeader>
+              <CardContent>
+                <StaggerContainer className="grid gap-4 md:grid-cols-4 mb-6">
+                  <StaggerItem>
+                    <motion.div 
+                      className="p-4 bg-blue-50 rounded-lg"
+                      whileHover={{ scale: 1.05, boxShadow: '0 10px 30px rgba(59, 130, 246, 0.2)' }}
+                    >
+                      <p className="text-sm text-gray-600 mb-1">Total Iuran</p>
+                      <motion.p 
+                        className="text-2xl"
+                        animate={{ scale: [1, 1.05, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        {reportData.fees.total}
+                      </motion.p>
+                    </motion.div>
+                  </StaggerItem>
+                  <StaggerItem>
+                    <motion.div 
+                      className="p-4 bg-green-50 rounded-lg"
+                      whileHover={{ scale: 1.05, boxShadow: '0 10px 30px rgba(34, 197, 94, 0.2)' }}
+                    >
+                      <p className="text-sm text-gray-600 mb-1">Sudah Bayar</p>
+                      <motion.p 
+                        className="text-2xl text-green-600"
+                        animate={{ 
+                          scale: [1, 1.08, 1],
+                          textShadow: [
+                            '0 0 10px rgba(34, 197, 94, 0)',
+                            '0 0 20px rgba(34, 197, 94, 0.5)',
+                            '0 0 10px rgba(34, 197, 94, 0)'
+                          ]
+                        }}
+                        transition={{ duration: 3, repeat: Infinity }}
+                      >
+                        {reportData.fees.paid}
+                      </motion.p>
+                    </motion.div>
+                  </StaggerItem>
+                  <StaggerItem>
+                    <motion.div 
+                      className="p-4 bg-amber-50 rounded-lg"
+                      whileHover={{ scale: 1.05, boxShadow: '0 10px 30px rgba(245, 158, 11, 0.2)' }}
+                    >
+                      <p className="text-sm text-gray-600 mb-1">Belum Bayar</p>
+                      <motion.p 
+                        className="text-2xl text-amber-600"
+                        animate={reportData.fees.pending > 0 ? { 
+                          scale: [1, 1.1, 1],
+                          textShadow: [
+                            '0 0 10px rgba(245, 158, 11, 0)',
+                            '0 0 20px rgba(245, 158, 11, 0.5)',
+                            '0 0 10px rgba(245, 158, 11, 0)'
+                          ]
+                        } : {}}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        {reportData.fees.pending}
+                      </motion.p>
+                    </motion.div>
+                  </StaggerItem>
+                  <StaggerItem>
+                    <motion.div 
+                      className="p-4 bg-purple-50 rounded-lg"
+                      whileHover={{ scale: 1.05, boxShadow: '0 10px 30px rgba(168, 85, 247, 0.2)' }}
+                    >
+                      <p className="text-sm text-gray-600 mb-1">Total Terkumpul</p>
+                      <motion.p 
+                        className="text-xl text-purple-600"
+                        animate={{ 
+                          scale: [1, 1.08, 1],
+                          textShadow: [
+                            '0 0 10px rgba(168, 85, 247, 0)',
+                            '0 0 25px rgba(168, 85, 247, 0.6)',
+                            '0 0 10px rgba(168, 85, 247, 0)'
+                          ]
+                        }}
+                        transition={{ duration: 2.5, repeat: Infinity }}
+                      >
+                        {formatCurrency(reportData.fees.paidAmount)}
+                      </motion.p>
+                    </motion.div>
+                  </StaggerItem>
+                </StaggerContainer>
               
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -218,9 +294,11 @@ export function Reports() {
               </div>
             </CardContent>
           </Card>
+          </AnimatedCard>
 
           {/* Laporan Bank Sampah */}
-          <Card>
+          <AnimatedCard variant="scale" delay={0.2}>
+          <Card className="border-0 shadow-2xl">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 rounded-lg">
@@ -285,9 +363,11 @@ export function Reports() {
               )}
             </CardContent>
           </Card>
+          </AnimatedCard>
 
           {/* Laporan Keuangan */}
-          <Card>
+          <AnimatedCard variant="scale" delay={0.3}>
+          <Card className="border-0 shadow-2xl">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-100 rounded-lg">
@@ -340,9 +420,11 @@ export function Reports() {
               </div>
             </CardContent>
           </Card>
+          </AnimatedCard>
 
           {/* Laporan Partisipasi */}
-          <Card>
+          <AnimatedCard variant="scale" delay={0.4}>
+          <Card className="border-0 shadow-2xl">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-100 rounded-lg">
@@ -403,9 +485,11 @@ export function Reports() {
               </div>
             </CardContent>
           </Card>
+          </AnimatedCard>
 
           {/* Laporan Tahunan */}
-          <Card>
+          <AnimatedCard variant="scale" delay={0.5}>
+          <Card className="border-0 shadow-2xl">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-indigo-100 rounded-lg">
@@ -433,6 +517,7 @@ export function Reports() {
               </div>
             </CardContent>
           </Card>
+          </AnimatedCard>
         </>
       ) : (
         <div className="text-center py-12">

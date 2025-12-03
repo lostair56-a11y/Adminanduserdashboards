@@ -240,6 +240,44 @@ class SupabaseClient {
         data: { subscription: { unsubscribe: () => {} } }
       };
     },
+
+    updateUser: async (attributes: { password?: string; email?: string; data?: any }) => {
+      try {
+        if (!this.session?.access_token) {
+          return { data: { user: null }, error: { message: 'Not authenticated' } };
+        }
+
+        const response = await fetch(`${this.url}/auth/v1/user`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': this.key,
+            'Authorization': `Bearer ${this.session.access_token}`,
+          },
+          body: JSON.stringify(attributes),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          console.error('❌ Update user error:', error);
+          return { data: { user: null }, error };
+        }
+
+        const user = await response.json();
+        
+        // Update session with new user data
+        if (this.session) {
+          this.session.user = user;
+          this.saveSession(this.session);
+        }
+        
+        console.log('✅ User updated successfully');
+        return { data: { user }, error: null };
+      } catch (error) {
+        console.error('❌ Exception in updateUser:', error);
+        return { data: { user: null }, error };
+      }
+    },
   };
 
   from(table: string) {

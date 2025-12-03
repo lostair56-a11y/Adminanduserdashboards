@@ -8,6 +8,11 @@ import { AddScheduleDialog } from './AddScheduleDialog';
 import { toast } from 'sonner@2.0.3';
 import { useAuth } from '../../contexts/AuthContext';
 import { getTrashSchedules, createTrashSchedule, updateSchedule, deleteSchedule } from '../../lib/db-helpers';
+import { motion, AnimatePresence } from 'motion/react';
+import { AnimatedCard } from '../animations/AnimatedCard';
+import { FloatingElement } from '../animations/FloatingElement';
+import { StaggerContainer, StaggerItem } from '../animations/StaggerContainer';
+import { GlowingBadge } from '../animations/GlowingBadge';
 
 interface Schedule {
   id: string;
@@ -91,90 +96,139 @@ export function ManageSchedule() {
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Calendar */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Kalender Pengangkutan</CardTitle>
-            <CardDescription>Pilih tanggal untuk melihat atau menambah jadwal</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="rounded-md border"
-            />
-          </CardContent>
-        </Card>
+        <AnimatedCard variant="slide" delay={0.1}>
+          <Card className="border-0 shadow-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FloatingElement duration={2}>
+                  <CalendarIcon className="h-5 w-5 text-blue-500" />
+                </FloatingElement>
+                Kalender Pengangkutan
+              </CardTitle>
+              <CardDescription>Pilih tanggal untuk melihat atau menambah jadwal</CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5 }}
+              >
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  className="rounded-md border"
+                />
+              </motion.div>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
 
         {/* Upcoming Schedules */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Jadwal Mendatang</CardTitle>
-                <CardDescription>Pengangkutan sampah yang dijadwalkan</CardDescription>
+        <AnimatedCard variant="slide" delay={0.2}>
+          <Card className="border-0 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FloatingElement duration={2.5} delay={0.3}>
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    </FloatingElement>
+                    Jadwal Mendatang
+                  </CardTitle>
+                  <CardDescription>Pengangkutan sampah yang dijadwalkan</CardDescription>
+                </div>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button onClick={() => setShowAddDialog(true)} className="shadow-lg">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tambah
+                  </Button>
+                </motion.div>
               </div>
-              <Button onClick={() => setShowAddDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Tambah
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+            </CardHeader>
+            <CardContent>
               {upcomingSchedules.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <motion.div 
+                  className="text-center py-8 text-gray-500"
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
                   <CalendarIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                   <p>Belum ada jadwal</p>
-                </div>
+                </motion.div>
               ) : (
-                upcomingSchedules.map((schedule) => (
-                  <div
-                    key={schedule.id}
-                    className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="text-sm text-gray-600">
-                          {new Date(schedule.date).toLocaleDateString('id-ID', {
-                            weekday: 'long',
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric',
-                          })}
-                        </p>
-                        <p className="mt-1">{schedule.area}</p>
-                      </div>
-                      <Badge variant="outline">{schedule.time}</Badge>
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleMarkComplete(schedule.id)}
-                        title="Tandai Selesai"
-                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                <StaggerContainer className="space-y-4">
+                  {upcomingSchedules.map((schedule, index) => (
+                    <StaggerItem key={schedule.id}>
+                      <motion.div
+                        className="p-4 border border-gray-200 rounded-lg"
+                        whileHover={{ 
+                          scale: 1.02, 
+                          boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+                          backgroundColor: 'rgba(249, 250, 251, 1)'
+                        }}
+                        transition={{ type: 'spring', stiffness: 300 }}
                       >
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Selesai
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteSchedule(schedule.id)}
-                        title="Hapus Jadwal"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Hapus
-                      </Button>
-                    </div>
-                  </div>
-                ))
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <motion.p 
+                              className="text-sm text-gray-600"
+                              animate={{ opacity: [0.7, 1, 0.7] }}
+                              transition={{ duration: 3, repeat: Infinity }}
+                            >
+                              {new Date(schedule.date).toLocaleDateString('id-ID', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                              })}
+                            </motion.p>
+                            <motion.p 
+                              className="mt-1"
+                              animate={{ scale: [1, 1.02, 1] }}
+                              transition={{ duration: 2, repeat: Infinity }}
+                            >
+                              {schedule.area}
+                            </motion.p>
+                          </div>
+                          <GlowingBadge variant="outline" glowColor="rgba(59, 130, 246, 0.3)">
+                            {schedule.time}
+                          </GlowingBadge>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleMarkComplete(schedule.id)}
+                              title="Tandai Selesai"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Selesai
+                            </Button>
+                          </motion.div>
+                          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteSchedule(schedule.id)}
+                              title="Hapus Jadwal"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Hapus
+                            </Button>
+                          </motion.div>
+                        </div>
+                      </motion.div>
+                    </StaggerItem>
+                  ))}
+                </StaggerContainer>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </AnimatedCard>
       </div>
 
       {/* All Schedules List */}

@@ -125,118 +125,229 @@ export function StatsOverview() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Floating Sparkles Background */}
+      <motion.div
+        className="absolute top-10 left-10 text-yellow-400 opacity-30"
+        animate={{
+          y: [-20, 20, -20],
+          rotate: [0, 360],
+          scale: [0.8, 1.2, 0.8],
+        }}
+        transition={{ duration: 5, repeat: Infinity }}
+      >
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 0l1.5 8.5L22 10l-8.5 1.5L12 20l-1.5-8.5L2 10l8.5-1.5L12 0z" />
+        </svg>
+      </motion.div>
+      <motion.div
+        className="absolute top-32 right-20 text-blue-400 opacity-20"
+        animate={{
+          y: [20, -20, 20],
+          rotate: [360, 0],
+          scale: [1, 0.5, 1],
+        }}
+        transition={{ duration: 7, repeat: Infinity }}
+      >
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 0l1.5 8.5L22 10l-8.5 1.5L12 20l-1.5-8.5L2 10l8.5-1.5L12 0z" />
+        </svg>
+      </motion.div>
+      <motion.div
+        className="absolute bottom-20 left-1/2 text-green-400 opacity-25"
+        animate={{
+          y: [-10, 10, -10],
+          x: [-10, 10, -10],
+          rotate: [0, 180, 360],
+          scale: [0.9, 1.1, 0.9],
+        }}
+        transition={{ duration: 6, repeat: Infinity }}
+      >
+        <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 0l1.5 8.5L22 10l-8.5 1.5L12 20l-1.5-8.5L2 10l8.5-1.5L12 0z" />
+        </svg>
+      </motion.div>
+
       {/* Stats Cards */}
-      <StaggerContainer className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <StaggerContainer className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 relative z-10">
         <StaggerItem>
-          <Card delay={0}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm">Total Iuran Terkumpul</CardTitle>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-              >
-                <DollarSign className="h-4 w-4 text-gray-600" />
-              </motion.div>
-            </CardHeader>
-            <CardContent>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 }}
-                className="text-2xl"
-              >
-                Rp {stats.totalFees.toLocaleString('id-ID')}
-              </motion.div>
-              <p className="text-xs text-gray-600 mt-1">{new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
-            </CardContent>
-          </Card>
+          <motion.div whileHover={{ scale: 1.05, y: -5 }}>
+            <Card delay={0}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Iuran Terkumpul</CardTitle>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1, rotate: [0, 360] }}
+                  transition={{ 
+                    scale: { delay: 0.2, type: 'spring', stiffness: 200 },
+                    rotate: { delay: 0.2, duration: 0.6 }
+                  }}
+                >
+                  <motion.div
+                    animate={{
+                      boxShadow: [
+                        '0 0 0px rgba(34, 197, 94, 0)',
+                        '0 0 15px rgba(34, 197, 94, 0.5)',
+                        '0 0 0px rgba(34, 197, 94, 0)',
+                      ]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="rounded-full p-1"
+                  >
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                  </motion.div>
+                </motion.div>
+              </CardHeader>
+              <CardContent>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="text-2xl"
+                >
+                  Rp {stats.totalFees.toLocaleString('id-ID')}
+                </motion.div>
+                <p className="text-xs text-gray-600 mt-1">{new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </StaggerItem>
 
         <StaggerItem>
-          <Card delay={0.1}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm">Warga Terdaftar</CardTitle>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-              >
-                <Users className="h-4 w-4 text-gray-600" />
-              </motion.div>
-            </CardHeader>
-            <CardContent>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4 }}
-                className="text-2xl"
-              >
-                {stats.totalResidents} KK
-              </motion.div>
-              <p className="text-xs text-gray-600 mt-1">Total kepala keluarga</p>
-            </CardContent>
-          </Card>
+          <motion.div whileHover={{ scale: 1.05, y: -5 }}>
+            <Card delay={0.1}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Warga Terdaftar</CardTitle>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1, rotate: [0, 360] }}
+                  transition={{ 
+                    scale: { delay: 0.3, type: 'spring', stiffness: 200 },
+                    rotate: { delay: 0.3, duration: 0.6 }
+                  }}
+                >
+                  <motion.div
+                    animate={{
+                      boxShadow: [
+                        '0 0 0px rgba(59, 130, 246, 0)',
+                        '0 0 15px rgba(59, 130, 246, 0.5)',
+                        '0 0 0px rgba(59, 130, 246, 0)',
+                      ]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                    className="rounded-full p-1"
+                  >
+                    <Users className="h-4 w-4 text-blue-600" />
+                  </motion.div>
+                </motion.div>
+              </CardHeader>
+              <CardContent>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="text-2xl"
+                >
+                  {stats.totalResidents} KK
+                </motion.div>
+                <p className="text-xs text-gray-600 mt-1">Total kepala keluarga</p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </StaggerItem>
 
         <StaggerItem>
-          <Card delay={0.2}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm">Total Saldo Bank Sampah</CardTitle>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
-              >
-                <Leaf className="h-4 w-4 text-gray-600" />
-              </motion.div>
-            </CardHeader>
-            <CardContent>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5 }}
-                className="text-2xl"
-              >
-                Rp {stats.totalWasteBankBalance.toLocaleString('id-ID')}
-              </motion.div>
-              <p className="text-xs text-gray-600 mt-1">Semua warga</p>
-            </CardContent>
-          </Card>
+          <motion.div whileHover={{ scale: 1.05, y: -5 }}>
+            <Card delay={0.2}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Saldo Bank Sampah</CardTitle>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1, rotate: [0, 360] }}
+                  transition={{ 
+                    scale: { delay: 0.4, type: 'spring', stiffness: 200 },
+                    rotate: { delay: 0.4, duration: 0.6 }
+                  }}
+                >
+                  <motion.div
+                    animate={{
+                      boxShadow: [
+                        '0 0 0px rgba(16, 185, 129, 0)',
+                        '0 0 15px rgba(16, 185, 129, 0.5)',
+                        '0 0 0px rgba(16, 185, 129, 0)',
+                      ]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                    className="rounded-full p-1"
+                  >
+                    <Leaf className="h-4 w-4 text-emerald-600" />
+                  </motion.div>
+                </motion.div>
+              </CardHeader>
+              <CardContent>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="text-2xl"
+                >
+                  Rp {stats.totalWasteBankBalance.toLocaleString('id-ID')}
+                </motion.div>
+                <p className="text-xs text-gray-600 mt-1">Semua warga</p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </StaggerItem>
 
         <StaggerItem>
-          <Card delay={0.3}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm">Partisipasi Bank Sampah</CardTitle>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
-              >
-                <TrendingUp className="h-4 w-4 text-gray-600" />
-              </motion.div>
-            </CardHeader>
-            <CardContent>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.6 }}
-                className="text-2xl"
-              >
-                {stats.participationRate}%
-              </motion.div>
-              <p className="text-xs text-gray-600 mt-1">Bulan ini</p>
-            </CardContent>
-          </Card>
+          <motion.div whileHover={{ scale: 1.05, y: -5 }}>
+            <Card delay={0.3}>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Partisipasi Bank Sampah</CardTitle>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1, rotate: [0, 360] }}
+                  transition={{ 
+                    scale: { delay: 0.5, type: 'spring', stiffness: 200 },
+                    rotate: { delay: 0.5, duration: 0.6 }
+                  }}
+                >
+                  <motion.div
+                    animate={{
+                      boxShadow: [
+                        '0 0 0px rgba(249, 115, 22, 0)',
+                        '0 0 15px rgba(249, 115, 22, 0.5)',
+                        '0 0 0px rgba(249, 115, 22, 0)',
+                      ]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity, delay: 1.5 }}
+                    className="rounded-full p-1"
+                  >
+                    <TrendingUp className="h-4 w-4 text-orange-600" />
+                  </motion.div>
+                </motion.div>
+              </CardHeader>
+              <CardContent>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.6 }}
+                  className="text-2xl"
+                >
+                  {stats.participationRate}%
+                </motion.div>
+                <p className="text-xs text-gray-600 mt-1">Bulan ini</p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </StaggerItem>
       </StaggerContainer>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 relative z-10">
         {/* Payment Status Pie Chart */}
-        <Card delay={0.4}>
+        <motion.div whileHover={{ scale: 1.02 }}>
+          <Card delay={0.4}>
           <CardHeader>
             <CardTitle>Status Pembayaran Warga</CardTitle>
             <CardDescription>Persentase pembayaran iuran bulan ini</CardDescription>
@@ -273,10 +384,12 @@ export function StatsOverview() {
               </ResponsiveContainer>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </motion.div>
 
         {/* Quick Info */}
-        <Card delay={0.5}>
+        <motion.div whileHover={{ scale: 1.02 }}>
+          <Card delay={0.5}>
           <CardHeader>
             <CardTitle>Ringkasan Bulan Ini</CardTitle>
             <CardDescription>Informasi penting RT</CardDescription>
@@ -338,7 +451,8 @@ export function StatsOverview() {
               </motion.div>
             </div>
           </CardContent>
-        </Card>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );
