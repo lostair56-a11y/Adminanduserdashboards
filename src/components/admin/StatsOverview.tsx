@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { AnimatedCard as Card, AnimatedCardContent as CardContent, AnimatedCardDescription as CardDescription, AnimatedCardHeader as CardHeader, AnimatedCardTitle as CardTitle } from '../ui/animated-card';
 import { DollarSign, Users, Leaf, TrendingUp } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { motion } from 'motion/react';
+import { StaggerContainer, StaggerItem } from '../animations/PageTransition';
 
 export function StatsOverview() {
   const { user, profile, userRole } = useAuth();
@@ -23,19 +25,17 @@ export function StatsOverview() {
     } else {
       setLoading(false);
     }
-  }, [user, profile, userRole]); // Re-run when auth data changes
+  }, [user, profile, userRole]);
 
   const loadStats = async () => {
     try {
       setLoading(true);
       
-      // Use user from AuthContext instead of calling auth.getUser()
       if (!user || userRole !== 'admin' || !profile) {
         setLoading(false);
         return;
       }
 
-      // Cast profile to AdminProfile to access rt and rw
       const adminProfile = profile as any;
 
       if (!adminProfile.rt || !adminProfile.rw) {
@@ -43,12 +43,10 @@ export function StatsOverview() {
         return;
       }
 
-      // Get current month and year
       const now = new Date();
       const currentMonth = now.toLocaleDateString('id-ID', { month: 'long' });
       const currentYear = now.getFullYear();
 
-      // Count total residents in same location as admin
       const { data: residents, count: residentsCount } = await supabase
         .from('resident_profiles')
         .select('id, waste_bank_balance', { count: 'exact' })
@@ -70,7 +68,6 @@ export function StatsOverview() {
         return;
       }
 
-      // Get payment data for current month (only for residents in same location)
       const { data: payments } = await supabase
         .from('fee_payments')
         .select('id, resident_id, amount, month, year, status, payment_date, payment_method, created_at')
@@ -78,17 +75,13 @@ export function StatsOverview() {
         .eq('month', currentMonth)
         .eq('year', currentYear);
 
-      // Calculate paid and unpaid
       const paidPayments = payments?.filter(p => p.status === 'paid') || [];
       const unpaidPayments = payments?.filter(p => p.status === 'unpaid') || [];
 
-      // Calculate total fees collected
       const totalFees = paidPayments.reduce((sum, p) => sum + p.amount, 0);
       
-      // Calculate total waste bank balance
       const totalWasteBankBalance = residents?.reduce((sum, r) => sum + (r.waste_bank_balance || 0), 0) || 0;
 
-      // Calculate participation rate (residents with waste deposits this month)
       const { count: depositsCount } = await supabase
         .from('waste_deposits')
         .select('resident_id', { count: 'exact', head: true })
@@ -122,7 +115,11 @@ export function StatsOverview() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="rounded-full h-12 w-12 border-b-2 border-blue-600"
+        />
       </div>
     );
   }
@@ -130,56 +127,116 @@ export function StatsOverview() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm">Total Iuran Terkumpul</CardTitle>
-            <DollarSign className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">Rp {stats.totalFees.toLocaleString('id-ID')}</div>
-            <p className="text-xs text-gray-600 mt-1">{new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
-          </CardContent>
-        </Card>
+      <StaggerContainer className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <StaggerItem>
+          <Card delay={0}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm">Total Iuran Terkumpul</CardTitle>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+              >
+                <DollarSign className="h-4 w-4 text-gray-600" />
+              </motion.div>
+            </CardHeader>
+            <CardContent>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-2xl"
+              >
+                Rp {stats.totalFees.toLocaleString('id-ID')}
+              </motion.div>
+              <p className="text-xs text-gray-600 mt-1">{new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm">Warga Terdaftar</CardTitle>
-            <Users className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">{stats.totalResidents} KK</div>
-            <p className="text-xs text-gray-600 mt-1">Total kepala keluarga</p>
-          </CardContent>
-        </Card>
+        <StaggerItem>
+          <Card delay={0.1}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm">Warga Terdaftar</CardTitle>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+              >
+                <Users className="h-4 w-4 text-gray-600" />
+              </motion.div>
+            </CardHeader>
+            <CardContent>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4 }}
+                className="text-2xl"
+              >
+                {stats.totalResidents} KK
+              </motion.div>
+              <p className="text-xs text-gray-600 mt-1">Total kepala keluarga</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm">Total Saldo Bank Sampah</CardTitle>
-            <Leaf className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">Rp {stats.totalWasteBankBalance.toLocaleString('id-ID')}</div>
-            <p className="text-xs text-gray-600 mt-1">Semua warga</p>
-          </CardContent>
-        </Card>
+        <StaggerItem>
+          <Card delay={0.2}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm">Total Saldo Bank Sampah</CardTitle>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
+              >
+                <Leaf className="h-4 w-4 text-gray-600" />
+              </motion.div>
+            </CardHeader>
+            <CardContent>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5 }}
+                className="text-2xl"
+              >
+                Rp {stats.totalWasteBankBalance.toLocaleString('id-ID')}
+              </motion.div>
+              <p className="text-xs text-gray-600 mt-1">Semua warga</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm">Partisipasi Bank Sampah</CardTitle>
-            <TrendingUp className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">{stats.participationRate}%</div>
-            <p className="text-xs text-gray-600 mt-1">Bulan ini</p>
-          </CardContent>
-        </Card>
-      </div>
+        <StaggerItem>
+          <Card delay={0.3}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm">Partisipasi Bank Sampah</CardTitle>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
+              >
+                <TrendingUp className="h-4 w-4 text-gray-600" />
+              </motion.div>
+            </CardHeader>
+            <CardContent>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.6 }}
+                className="text-2xl"
+              >
+                {stats.participationRate}%
+              </motion.div>
+              <p className="text-xs text-gray-600 mt-1">Bulan ini</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Payment Status Pie Chart */}
-        <Card>
+        <Card delay={0.4}>
           <CardHeader>
             <CardTitle>Status Pembayaran Warga</CardTitle>
             <CardDescription>Persentase pembayaran iuran bulan ini</CardDescription>
@@ -219,14 +276,20 @@ export function StatsOverview() {
         </Card>
 
         {/* Quick Info */}
-        <Card>
+        <Card delay={0.5}>
           <CardHeader>
             <CardTitle>Ringkasan Bulan Ini</CardTitle>
             <CardDescription>Informasi penting RT</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6 }}
+                whileHover={{ scale: 1.02 }}
+                className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200"
+              >
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center">
                     <DollarSign className="h-5 w-5 text-white" />
@@ -236,9 +299,15 @@ export function StatsOverview() {
                     <p className="text-lg">{stats.paidCount} Warga</p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
-              <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.7 }}
+                whileHover={{ scale: 1.02 }}
+                className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200"
+              >
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-red-500 flex items-center justify-center">
                     <DollarSign className="h-5 w-5 text-white" />
@@ -248,9 +317,15 @@ export function StatsOverview() {
                     <p className="text-lg">{stats.unpaidCount} Warga</p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.8 }}
+                whileHover={{ scale: 1.02 }}
+                className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200"
+              >
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
                     <Leaf className="h-5 w-5 text-white" />
@@ -260,7 +335,7 @@ export function StatsOverview() {
                     <p className="text-lg">{stats.participationRate}% Warga</p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </CardContent>
         </Card>

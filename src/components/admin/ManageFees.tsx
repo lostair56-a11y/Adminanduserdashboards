@@ -101,9 +101,31 @@ export function ManageFees() {
     0
   );
 
-  const sendReminder = (residentId: string) => {
-    const residentName = getResidentName(residentId);
-    toast.success(`Pengingat pembayaran telah dikirim ke ${residentName}`);
+  const sendReminder = async (residentId: string, feeId: string) => {
+    try {
+      const accessToken = localStorage.getItem('sb-access-token');
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/send-reminder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          resident_id: residentId,
+          fee_id: feeId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send reminder');
+      }
+
+      const residentName = getResidentName(residentId);
+      toast.success(`Pengingat pembayaran telah dikirim ke ${residentName}`);
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+      toast.error('Gagal mengirim pengingat');
+    }
   };
 
   const handleDeleteFee = async (feeId: string) => {
@@ -247,7 +269,7 @@ export function ManageFees() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => sendReminder(record.resident_id)}
+                            onClick={() => sendReminder(record.resident_id, record.id)}
                           >
                             <Bell className="h-4 w-4 mr-2" />
                             Kirim Pengingat

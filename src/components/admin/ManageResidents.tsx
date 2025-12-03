@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { AnimatedCard as Card, AnimatedCardContent as CardContent, AnimatedCardDescription as CardDescription, AnimatedCardHeader as CardHeader, AnimatedCardTitle as CardTitle } from '../ui/animated-card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ResidentProfile {
   id: string;
@@ -96,25 +97,36 @@ export function ManageResidents() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="rounded-full h-12 w-12 border-b-2 border-blue-600"
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card delay={0}>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          >
             <div>
               <CardTitle>Data Warga Terdaftar</CardTitle>
               <CardDescription>Kelola data seluruh warga RT ({residents.length} warga)</CardDescription>
             </div>
-            <Button onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Tambah Warga
-            </Button>
-          </div>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tambah Warga
+              </Button>
+            </motion.div>
+          </motion.div>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
@@ -165,71 +177,84 @@ export function ManageResidents() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredResidents.map((resident) => (
-                    <TableRow key={resident.id}>
-                      <TableCell>
-                        <div>
-                          <p>{resident.name}</p>
+                  <AnimatePresence mode="popLayout">
+                    {filteredResidents.map((resident, index) => (
+                      <motion.tr
+                        key={resident.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, x: -100 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        layout
+                      >
+                        <TableCell>
+                          <div>
+                            <p>{resident.name}</p>
+                            <p className="text-xs text-gray-500">
+                              RT {resident.rt} / RW {resident.rw}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Home className="h-4 w-4 text-gray-400" />
+                            {resident.house_number}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1 text-sm">
+                              <Phone className="h-3 w-3 text-gray-400" />
+                              {resident.phone}
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                              <Mail className="h-3 w-3 text-gray-400" />
+                              {resident.email}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-[200px] truncate" title={resident.address}>
+                            {resident.address}
+                          </div>
                           <p className="text-xs text-gray-500">
-                            RT {resident.rt} / RW {resident.rw}
+                            {resident.kelurahan}, {resident.kecamatan}
                           </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Home className="h-4 w-4 text-gray-400" />
-                          {resident.house_number}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1 text-sm">
-                            <Phone className="h-3 w-3 text-gray-400" />
-                            {resident.phone}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Wallet className="h-4 w-4 text-green-600" />
+                            <span className="text-green-600">
+                              Rp {(resident.waste_bank_balance || 0).toLocaleString('id-ID')}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Mail className="h-3 w-3 text-gray-400" />
-                            {resident.email}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingResident(resident)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </motion.div>
+                            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDeleteResident(resident)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </motion.div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-[200px] truncate" title={resident.address}>
-                          {resident.address}
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          {resident.kelurahan}, {resident.kecamatan}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Wallet className="h-4 w-4 text-green-600" />
-                          <span className="text-green-600">
-                            Rp {(resident.waste_bank_balance || 0).toLocaleString('id-ID')}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setEditingResident(resident)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteResident(resident)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
                 )}
               </TableBody>
             </Table>

@@ -1,5 +1,24 @@
 # Cara Update RLS Policy di Supabase
 
+## 🚨 PENTING - Pilih SQL Yang Tepat:
+
+Ada 2 file SQL yang bisa Anda gunakan:
+
+### Option 1: Fix Semua RLS (RECOMMENDED) ✅
+**File**: `/FIX-SEMUA-RLS-POLICIES.sql`
+- Memperbaiki SEMUA tabel sekaligus (resident_profiles, fee_payments, waste_bank_transactions, pickup_schedules)
+- Lengkap dengan SELECT, INSERT, UPDATE, DELETE untuk setiap tabel
+- Cocok untuk fix menyeluruh satu kali jalan
+- **Gunakan ini jika Anda ingin perbaikan lengkap!**
+
+### Option 2: Fix Resident Profiles Saja
+**File**: `/FIX-RLS-RESIDENT-UPDATE.sql`
+- Hanya memperbaiki tabel resident_profiles
+- Untuk UPDATE dan DELETE saja
+- Cocok jika hanya masalah di tabel warga
+
+---
+
 ## Langkah-langkah:
 
 ### 1. Buka Supabase Dashboard
@@ -11,7 +30,7 @@
 - Atau langsung ke: https://supabase.com/dashboard/project/[PROJECT_ID]/sql
 
 ### 3. Jalankan SQL Fix
-- Copy semua isi dari file `/FIX-RLS-RESIDENT-UPDATE.sql`
+- **RECOMMENDED**: Copy semua isi dari file `/FIX-SEMUA-RLS-POLICIES.sql`
 - Paste ke SQL Editor
 - Klik tombol **RUN** atau tekan `Ctrl+Enter` / `Cmd+Enter`
 

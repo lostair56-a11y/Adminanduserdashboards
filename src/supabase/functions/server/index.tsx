@@ -438,7 +438,12 @@ app.delete('/make-server-64eec44a/fees/:id', fees.deleteFee);
 app.post('/make-server-64eec44a/fees/pay', fees.payFee);
 app.get('/make-server-64eec44a/fees/pending', fees.getPendingPayments);
 app.post('/make-server-64eec44a/fees/verify', fees.verifyPayment);
+app.post('/make-server-64eec44a/fees/send-reminder', fees.sendReminder);
 app.get('/make-server-64eec44a/fees/:residentId?', fees.getFees);
+
+// Notification endpoints
+app.get('/make-server-64eec44a/notifications', fees.getNotifications);
+app.put('/make-server-64eec44a/notifications/:id/read', fees.markNotificationRead);
 
 // Waste bank endpoints
 app.post('/make-server-64eec44a/wastebank/deposit', wastebank.addWasteDeposit);

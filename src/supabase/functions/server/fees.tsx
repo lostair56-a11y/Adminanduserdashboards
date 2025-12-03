@@ -681,3 +681,137 @@ export async function deleteFee(c: Context) {
     return c.json({ error: 'Internal server error' }, 500);
   }
 }
+
+// Send payment reminder
+export async function sendReminder(c: Context) {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Check if user is admin
+    const { data: adminProfile, error: adminError } = await supabase
+      .from('admin_profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    
+    if (adminError || !adminProfile) {
+      return c.json({ error: 'Unauthorized - Admin access required' }, 403);
+    }
+    
+    const body = await c.req.json();
+    const { resident_id, fee_id, message } = body;
+    
+    if (!resident_id || !fee_id) {
+      return c.json({ error: 'resident_id and fee_id are required' }, 400);
+    }
+    
+    // Get fee details
+    const { data: fee, error: feeError } = await supabase
+      .from('fee_payments')
+      .select('*')
+      .eq('id', fee_id)
+      .single();
+    
+    if (feeError || !fee) {
+      return c.json({ error: 'Fee not found' }, 404);
+    }
+    
+    // Get resident details
+    const { data: resident, error: residentError } = await supabase
+      .from('resident_profiles')
+      .select('name')
+      .eq('id', resident_id)
+      .single();
+    
+    if (residentError || !resident) {
+      return c.json({ error: 'Resident not found' }, 404);
+    }
+    
+    // Create notification
+    await supabase
+      .from('notifications')
+      .insert({
+        user_id: resident_id,
+        title: 'Pengingat Pembayaran Iuran',
+        message: message || `Halo ${resident.name}, ini adalah pengingat untuk segera membayar iuran ${fee.month} ${fee.year} sebesar Rp ${fee.amount.toLocaleString('id-ID')}. Terima kasih.`,
+        type: 'warning',
+        read: false
+      });
+    
+    return c.json({ success: true, message: 'Reminder sent successfully' });
+  } catch (error) {
+    console.error('Error sending reminder:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+
+// Get notifications for a user
+export async function getNotifications(c: Context) {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    // Get notifications for the user
+    const { data: notifications, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (error) {
+      console.error('Error fetching notifications:', error);
+      return c.json({ error: error.message }, 400);
+    }
+    
+    return c.json({ notifications: notifications || [] });
+  } catch (error) {
+    console.error('Error in get notifications:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}
+
+// Mark notification as read
+export async function markNotificationRead(c: Context) {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    
+    const notificationId = c.req.param('id');
+    
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', notificationId)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error marking notification as read:', error);
+      return c.json({ error: error.message }, 400);
+    }
+    
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Error in mark notification read:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+}

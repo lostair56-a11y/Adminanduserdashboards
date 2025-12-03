@@ -13,6 +13,8 @@ import { AdminProfile } from './admin/AdminProfile';
 import { PendingPaymentsDialog } from './admin/PendingPaymentsDialog';
 import { supabase } from '../lib/supabase';
 import { getPendingFees } from '../lib/db-helpers';
+import { motion, AnimatePresence } from 'motion/react';
+import { PageTransition } from './animations/PageTransition';
 
 type MenuItem = 'dashboard' | 'residents' | 'fees' | 'wastebank' | 'schedule' | 'reports' | 'profile';
 
