@@ -182,41 +182,35 @@ export async function getPendingFees() {
     throw new Error('No active session');
   }
 
-  // Get admin's RT/RW
-  const { data: adminProfile } = await supabase.from('admin_profiles')
-    .select('rt, rw')
-    .eq('id', session.user.id)
-    .single();
+  // Fetch from backend endpoint to get payment_proof from KV store
+  const response = await fetch(
+    `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/pending`,
+    {
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
 
-  if (!adminProfile) {
-    throw new Error('Admin profile not found');
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch pending fees');
   }
 
-  // Get all residents in same RT/RW
-  const { data: residents } = await supabase
-    .from('resident_profiles')
-    .select('id')
-    .eq('rt', adminProfile.rt)
-    .eq('rw', adminProfile.rw);
-
-  const residentIds = residents?.map(r => r.id) || [];
-
-  if (residentIds.length === 0) {
-    return [];
-  }
-
-  // Fetch fees with status 'unpaid' that have payment_date filled (waiting for verification)
-  const { data, error } = await supabase
-    .from('fee_payments')
-    .select('*, resident:resident_profiles(name, house_number, phone)')
-    .eq('status', 'unpaid')
-    .in('resident_id', residentIds)
-    .order('payment_date', { ascending: false });
-
-  if (error) throw error;
+  const data = await response.json();
+  console.log('✅ Pending fees fetched from backend:', data.fees);
+  console.log('🔍 Checking payment_proof for each pending fee:');
+  data.fees?.forEach((fee: any) => {
+    console.log(`Fee ${fee.id} (${fee.month} ${fee.year}):`, {
+      resident: fee.resident?.name,
+      payment_date: fee.payment_date,
+      payment_method: fee.payment_method,
+      payment_proof: fee.payment_proof
+    });
+  });
   
-  // Filter for fees that have payment_date (payment submitted, waiting for verification)
-  return (data || []).filter(fee => fee.payment_date != null);
+  return data.fees || [];
 }
 
 export async function createFee(feeData: {
@@ -338,29 +332,34 @@ export async function updateFee(feeId: string, updates: {
 }
 
 export async function verifyPayment(feeId: string, action: 'approve' | 'reject') {
-  const status = action === 'approve' ? 'paid' : 'unpaid';
-
-  const updateData: any = { 
-    status
-  };
+  const { data: { session } } = await supabase.auth.getSession();
   
-  // If rejecting, clear payment info
-  if (action === 'reject') {
-    // NOTE: payment_proof column disabled until added to database
-    // updateData.payment_proof = null;
-    updateData.payment_date = null;
-    updateData.payment_method = null;
+  if (!session) {
+    throw new Error('No active session');
   }
 
-  const { data, error } = await supabase
-    .from('fee_payments')
-    .update(updateData)
-    .eq('id', feeId)
-    .select()
-    .single();
+  // Use backend endpoint to properly handle payment_proof in KV store
+  const response = await fetch(
+    `https://${projectId}.supabase.co/functions/v1/make-server-64eec44a/fees/verify`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ feeId, action })
+    }
+  );
 
-  if (error) throw error;
-  return data;
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to verify payment');
+  }
+
+  const data = await response.json();
+  console.log(`✅ Payment ${action === 'approve' ? 'approved' : 'rejected'}:`, data.fee);
+  
+  return data.fee;
 }
 
 export async function deleteFee(feeId: string) {

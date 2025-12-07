@@ -198,18 +198,20 @@ export async function getFees(c: Context) {
     console.log('✅ Fees fetched successfully, count:', fees?.length || 0);
     console.log('📊 Fees data:', JSON.stringify(fees, null, 2));
 
-    // Fetch descriptions from KV store
+    // Fetch descriptions and payment proofs from KV store
     const feesWithDescriptions = await Promise.all(
       (fees || []).map(async (fee) => {
         const description = await kv.get(`fee_description_${fee.id}`);
+        const paymentProof = await kv.get(`payment_proof_${fee.id}`);
         return {
           ...fee,
-          description: description || fee.description
+          description: description || fee.description,
+          payment_proof: paymentProof || fee.payment_proof
         };
       })
     );
 
-    console.log('🎉 Returning fees with descriptions:', feesWithDescriptions.length);
+    console.log('🎉 Returning fees with descriptions and proofs:', feesWithDescriptions.length);
     return c.json({ fees: feesWithDescriptions });
   } catch (error) {
     console.error('💥 Error in get fees:', error);
@@ -290,18 +292,17 @@ export async function payFee(c: Context) {
     // Store payment proof URL in KV store
     if (paymentProofUrl) {
       await kv.set(`payment_proof_${feeId}`, paymentProofUrl);
+      console.log('✅ Payment proof stored in KV store:', paymentProofUrl);
     }
     
     // Update fee with payment info but keep status as unpaid (waiting for admin verification)
-    // We use unpaid status with payment_date/method filled to indicate pending verification
-    // NOTE: payment_proof removed temporarily until column is added to database
-    // Run: ALTER TABLE fee_payments ADD COLUMN payment_proof TEXT;
+    // Status stays "unpaid" but payment_date + payment_method indicates pending verification
     const { data: updatedFee, error: updateError } = await supabase
       .from('fee_payments')
       .update({
+        status: 'unpaid',  // Keep as unpaid until admin approves
         payment_date: new Date().toISOString(),
         payment_method: paymentMethod,
-        // payment_proof: paymentProofUrl  // Disabled - column doesn't exist yet
       })
       .eq('id', feeId)
       .select()
@@ -394,7 +395,7 @@ export async function getPendingPayments(c: Context) {
       return c.json({ fees: [] });
     }
     
-    // Get all pending fee payments (unpaid with payment_date filled) for residents in this RT/RW
+    // Get all pending fee payments (status='unpaid' but with payment_date) for residents in this RT/RW
     const { data: fees, error: feesError } = await supabase
       .from('fee_payments')
       .select(`
@@ -408,8 +409,8 @@ export async function getPendingPayments(c: Context) {
         )
       `)
       .in('resident_id', residentIds)
-      .eq('status', 'unpaid')
-      .not('payment_date', 'is', null)
+      .eq('status', 'unpaid')  // Status is unpaid
+      .not('payment_date', 'is', null)  // But payment_date exists (pending verification)
       .order('payment_date', { ascending: false });
     
     if (feesError) {
@@ -464,17 +465,18 @@ export async function verifyPayment(c: Context) {
       return c.json({ error: 'Missing required fields' }, 400);
     }
     
-    // Get the fee
+    // Get the fee with status 'unpaid' but with payment_date (pending verification)
     const { data: fee, error: feeError } = await supabase
       .from('fee_payments')
       .select('*')
       .eq('id', feeId)
-      .eq('status', 'unpaid')
-      .not('payment_date', 'is', null)
+      .eq('status', 'unpaid')  // Status is unpaid
+      .not('payment_date', 'is', null)  // But payment_date exists (pending verification)
       .single();
     
     if (feeError || !fee) {
-      return c.json({ error: 'Fee not found or not pending' }, 404);
+      console.error('Error fetching fee for verification:', feeError);
+      return c.json({ error: 'Fee not found or not pending verification' }, 404);
     }
     
     let newStatus = 'unpaid';

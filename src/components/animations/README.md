@@ -1,163 +1,102 @@
-# Komponen Animasi SikasRT
+# 🎨 Komponen Animasi SikasRT
 
-Dokumentasi komponen animasi yang digunakan di sistem SikasRT untuk meningkatkan user experience.
+Koleksi komponen animasi spektakuler menggunakan Motion (Framer Motion) untuk meningkatkan UX aplikasi SikasRT.
 
-## 📦 Komponen yang Tersedia
+## 📁 Daftar Komponen
 
-### 1. LoadingSkeleton
-Skeleton loading dengan shimmer effect untuk memberikan feedback visual saat data loading.
+### 1. **AnimatedCard** 
+Kartu dengan efek hover dan animasi masuk yang smooth.
 
-**Props:**
-- `variant`: 'card' | 'text' | 'circle' | 'button' | 'input' | 'bankinfo'
-- `className`: Custom styling
-- `count`: Jumlah skeleton yang ditampilkan
+### 2. **AnimatedInput**
+Input fields dengan micro-interactions: focus glow, shake on error, success pulse.
 
-**Penggunaan:**
+### 3. **ConfettiEffect**
+Konfeti spektakuler saat pembayaran berhasil dengan 50 partikel berwarna-warni.
+
+### 4. **FloatingElement**
+Elemen mengambang dengan gerakan smooth untuk dekorasi UI.
+
+### 5. **GlowingBadge**
+Badge dengan efek glow pulsing untuk menarik perhatian.
+
+### 6. **LoadingSkeleton**
+Skeleton loader dengan shimmer effect untuk pengalaman loading yang smooth.
+
+### 7. **PageTransition**
+Transisi halaman dengan slide dan fade effect.
+
+### 8. **PulsingButton**
+Tombol dengan efek pulsing untuk call-to-action penting.
+
+### 9. **StaggerContainer & StaggerItem**
+Container untuk animasi berurutan pada list items.
+
+### 10. **ProofViewer** ✨ NEW
+Dialog spektakuler untuk melihat bukti transfer dengan:
+- Animasi 3D rotate dan zoom
+- Floating particles dan shimmer effect
+- Background gradient animasi
+- Download dan buka di tab baru
+- Glow effect pulsing
+- Hover scale dan shadow
+
+## 🎯 Cara Penggunaan ProofViewer
+
 ```tsx
-import { LoadingSkeleton, BankAccountSkeleton, CardSkeleton } from './components/animations/LoadingSkeleton';
+import { ProofViewer } from './components/animations/ProofViewer';
 
-// Basic skeleton
-<LoadingSkeleton variant="input" />
+// Di dalam komponen
+const [viewProofUrl, setViewProofUrl] = useState<string | null>(null);
 
-// Multiple skeletons
-<LoadingSkeleton variant="text" count={3} />
-
-// Bank account skeleton (specialized)
-<BankAccountSkeleton />
-
-// Card grid skeleton
-<CardSkeleton count={4} />
-```
-
-### 2. AnimatedInput
-Input field dengan micro-interactions seperti focus glow, scale animation, dan error states.
-
-**Props:**
-- Semua props dari HTMLInputElement
-- `label`: Label untuk input
-- `error`: Error message (akan menampilkan red border dan message)
-
-**Penggunaan:**
-```tsx
-import { AnimatedInput, AnimatedNumberInput, AnimatedTextarea } from './components/animations/AnimatedInput';
-
-// Basic animated input
-<AnimatedInput 
-  label="Nama Lengkap"
-  value={name}
-  onChange={(e) => setName(e.target.value)}
-  placeholder="Masukkan nama"
-/>
-
-// Number input dengan particle effect
-<AnimatedNumberInput
-  label="Berat (kg)"
-  value={weight}
-  onChange={(value) => setWeight(value)}
-  step="0.1"
-/>
-
-// Textarea
-<AnimatedTextarea
-  label="Keterangan"
-  value={notes}
-  onChange={(e) => setNotes(e.target.value)}
-  rows={4}
+<ProofViewer
+  open={!!viewProofUrl}
+  onOpenChange={() => setViewProofUrl(null)}
+  imageUrl={viewProofUrl!}
+  title="Bukti Transfer Pembayaran"
+  description="Verifikasi bukti transfer dari warga"
+  downloadFilename={`bukti-${month}-${year}.jpg`}
 />
 ```
 
-### 3. ConfettiEffect
-Efek confetti celebration yang muncul saat tindakan berhasil (seperti pembayaran sukses).
+## 🌟 Fitur ProofViewer
 
-**Props:**
-- `active`: Boolean untuk mengaktifkan efek
-- `onComplete`: Callback saat animasi selesai
+1. **Animasi Masuk Spektakuler**
+   - 3D rotation saat muncul
+   - Scale dan fade effect
+   - Spring physics untuk gerakan natural
 
-**Penggunaan:**
-```tsx
-import { ConfettiEffect, SimpleConfetti, SuccessCelebration } from './components/animations/ConfettiEffect';
+2. **Background Animasi**
+   - Gradient bergerak otomatis
+   - Floating particles dengan randomized motion
+   - Shimmer overlay effect
 
-// Canvas-based confetti (lebih realistic)
-<ConfettiEffect 
-  active={showConfetti} 
-  onComplete={() => setShowConfetti(false)}
-/>
+3. **Interaksi Gambar**
+   - Hover untuk zoom dan shadow
+   - Klik untuk toggle fullscreen
+   - Loading state dengan spinner
 
-// CSS-based confetti (lebih ringan)
-<SimpleConfetti active={showConfetti} />
+4. **Action Buttons**
+   - Buka di tab baru
+   - Download dengan auto-naming
+   - Close button dengan rotate animation
 
-// Success celebration dengan message
-<SuccessCelebration 
-  show={showCelebration} 
-  message="Pembayaran Berhasil!"
-  onComplete={() => setShowCelebration(false)}
-/>
-```
+5. **Visual Effects**
+   - Pulsing glow dengan gradasi warna
+   - Sparkle particles
+   - Floating orbs dengan blur
 
-## 🎨 Fitur Animasi
+## 🎨 Tema Animasi
 
-### Shimmer Loading
-- Gradient shimmer yang bergerak dari kiri ke kanan
-- Memberikan feedback visual yang smooth saat data loading
-- Mengurangi perceived loading time
+Semua animasi menggunakan:
+- **Spring physics** untuk gerakan natural
+- **Stagger effect** untuk list items
+- **Hover states** untuk interaktivitas
+- **Color gradients** biru-ungu-pink
+- **Shadow dan glow** untuk depth
 
-### Focus Glow
-- Border glow dengan gradient saat input difocus
-- Smooth scale animation
-- Color-coded untuk different states (focus, error, success)
+## 🚀 Performance
 
-### Micro-interactions
-- Scale animation saat tap/click
-- Hover effects pada buttons dan cards
-- Smooth transitions pada semua state changes
-
-### Confetti Celebration
-- 100 partikel confetti dengan physics realistic
-- 12 warna berbeda untuk variasi
-- Gravity simulation untuk gerakan natural
-- Auto-cleanup setelah 3 detik
-
-## 🎯 Best Practices
-
-1. **Loading States**: Selalu gunakan LoadingSkeleton untuk loading states, jangan gunakan spinner biasa
-2. **Form Inputs**: Gunakan AnimatedInput untuk semua form inputs agar konsisten
-3. **Success Actions**: Gunakan SuccessCelebration untuk action sukses yang penting (payment, submission)
-4. **Performance**: Gunakan SimpleConfetti untuk perangkat low-end, ConfettiEffect untuk pengalaman maksimal
-5. **Accessibility**: Semua animasi respect `prefers-reduced-motion`
-
-## 📱 Responsive Design
-
-Semua komponen animasi sudah responsive dan akan menyesuaikan dengan ukuran layar:
-- Mobile: Animasi lebih subtle
-- Tablet: Balanced animations
-- Desktop: Full animations dengan efek maksimal
-
-## 🔧 Customization
-
-Anda bisa customize animasi dengan mengubah props Motion:
-
-```tsx
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.5, type: 'spring' }}
->
-  Content
-</motion.div>
-```
-
-## 🎭 Animation Timings
-
-Default timing yang digunakan:
-- `duration: 0.3s` - Quick interactions (hover, tap)
-- `duration: 0.5s` - Standard transitions (fade, slide)
-- `duration: 1.5s` - Loading states (shimmer)
-- `duration: 3s` - Celebration effects (confetti)
-
-## 💡 Tips
-
-1. Jangan overuse animasi - gunakan dengan bijak
-2. Pastikan animasi tidak mengganggu user flow
-3. Test di berbagai devices dan browsers
-4. Monitor performance dengan React DevTools
-5. Gunakan `AnimatePresence` untuk exit animations
+- Menggunakan `will-change` CSS untuk optimisasi
+- Lazy rendering dengan `AnimatePresence`
+- Debounced animations untuk performa smooth
+- GPU acceleration untuk transform properties
